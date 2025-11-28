@@ -39,6 +39,9 @@
         <div class="modal-content">
             <span class="close" onclick="closeModal('bookingModal')">&times;</span>
             <h2>Schedule a Viewing</h2>
+            <div class="warning-message" id="bookingWarning">
+                ⚠️ <strong>High-Demand Notice:</strong> In high-demand periods, multiple customers may try to book the same time slot simultaneously. If your preferred slot is already taken, you'll be added to a queue and notified immediately if it becomes available. Please check your confirmation status after booking.
+            </div>
             <form id="bookingForm" onsubmit="handleBooking(event)">
                 <div class="form-group">
                     <label for="appointmentDate">Preferred Date</label>

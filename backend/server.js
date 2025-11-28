@@ -27,6 +27,7 @@ const appointmentRoutes = require('./routes/appointments');
 const userRoutes = require('./routes/users');
 const notificationRoutes = require('./routes/notifications');
 const waitlistRoutes = require('./routes/waitlist');
+const ratingsRoutes = require('./routes/ratings');
 
 // Create Express app
 const app = express();
@@ -82,6 +83,7 @@ app.use('/api/appointments', appointmentRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/waitlist', waitlistRoutes);
+app.use('/api/ratings', ratingsRoutes);
 
 // ============================================================================
 // Error Handling
@@ -136,6 +138,7 @@ const startServer = async () => {
             console.log('  PUT  /api/properties/:id');
             console.log('  DELETE /api/properties/:id');
             console.log('  GET  /api/appointments');
+            console.log('  GET  /api/appointments/available-slots/:propertyId');
             console.log('  GET  /api/appointments/:id');
             console.log('  POST /api/appointments');
             console.log('  PUT  /api/appointments/:id');
@@ -150,6 +153,10 @@ const startServer = async () => {
             console.log('  GET  /api/waitlist');
             console.log('  POST /api/waitlist');
             console.log('  DELETE /api/waitlist/:id');
+            console.log('  POST /api/ratings');
+            console.log('  GET  /api/ratings/agent/:agentId');
+            console.log('  GET  /api/ratings/agent/:agentId/summary');
+            console.log('  GET  /api/ratings/can-rate/:appointmentId');
             console.log('========================================\n');
         });
     } catch (error) {

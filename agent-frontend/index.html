@@ -55,6 +55,7 @@
                 <div class="page-header">
                     <h1>Dashboard</h1>
                     <p>Welcome back! Here's your overview.</p>
+                    <div class="agent-rating-display" id="agentRating"></div>
                 </div>
                 
                 <div class="stats-grid">
@@ -114,6 +115,7 @@
                 <div class="tabs">
                     <button class="tab active" onclick="filterAppointments('pending')">Pending</button>
                     <button class="tab" onclick="filterAppointments('confirmed')">Confirmed</button>
+                    <button class="tab" onclick="filterAppointments('queued')">Queued</button>
                     <button class="tab" onclick="filterAppointments('completed')">Completed</button>
                     <button class="tab" onclick="filterAppointments('cancelled')">Cancelled</button>
                     <button class="tab" onclick="filterAppointments('')">All</button>
@@ -147,6 +149,7 @@
                     <select id="appointmentStatus" required>
                         <option value="pending">Pending</option>
                         <option value="confirmed">Confirmed</option>
+                        <option value="queued">Queued</option>
                         <option value="completed">Completed</option>
                         <option value="cancelled">Cancelled</option>
                     </select>
@@ -165,6 +168,97 @@
                 </div>
                 <div class="error-message hidden" id="appointmentError"></div>
                 <button type="submit" class="btn btn-primary btn-full">Update Appointment</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Add/Edit Property Modal -->
+    <div class="modal" id="propertyModal">
+        <div class="modal-content modal-lg">
+            <span class="close" onclick="closeModal('propertyModal')">&times;</span>
+            <h2 id="propertyModalTitle">Add New Property</h2>
+            <form id="propertyForm" onsubmit="saveProperty(event)">
+                <input type="hidden" id="propertyId">
+                <div class="form-group">
+                    <label for="propertyTitle">Title *</label>
+                    <input type="text" id="propertyTitle" required placeholder="e.g., Modern Downtown Condo">
+                </div>
+                <div class="form-group">
+                    <label for="propertyDescription">Description</label>
+                    <textarea id="propertyDescription" rows="3" placeholder="Describe the property..."></textarea>
+                </div>
+                <div class="form-group">
+                    <label for="propertyAddress">Address *</label>
+                    <input type="text" id="propertyAddress" required placeholder="Street address">
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="propertyCity">City *</label>
+                        <input type="text" id="propertyCity" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="propertyState">State *</label>
+                        <input type="text" id="propertyState" required maxlength="2" placeholder="WA">
+                    </div>
+                    <div class="form-group">
+                        <label for="propertyZip">Zip Code *</label>
+                        <input type="text" id="propertyZip" required placeholder="98101">
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="propertyPrice">Price *</label>
+                        <input type="number" id="propertyPrice" required step="0.01" min="0">
+                    </div>
+                    <div class="form-group">
+                        <label for="propertyType">Property Type *</label>
+                        <select id="propertyType" required>
+                            <option value="house">House</option>
+                            <option value="apartment">Apartment</option>
+                            <option value="condo">Condo</option>
+                            <option value="land">Land</option>
+                            <option value="commercial">Commercial</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="propertyListingType">Listing Type *</label>
+                        <select id="propertyListingType" required>
+                            <option value="sale">For Sale</option>
+                            <option value="rent">For Rent</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="propertyBedrooms">Bedrooms</label>
+                        <input type="number" id="propertyBedrooms" min="0" value="0">
+                    </div>
+                    <div class="form-group">
+                        <label for="propertyBathrooms">Bathrooms</label>
+                        <input type="number" id="propertyBathrooms" min="0" step="0.5" value="0">
+                    </div>
+                    <div class="form-group">
+                        <label for="propertySqFt">Square Feet</label>
+                        <input type="number" id="propertySqFt" min="0" value="0">
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="propertyStatus">Status</label>
+                        <select id="propertyStatus">
+                            <option value="available">Available</option>
+                            <option value="pending">Pending</option>
+                            <option value="sold">Sold</option>
+                            <option value="rented">Rented</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="propertyImageUrl">Image URL</label>
+                        <input type="url" id="propertyImageUrl" placeholder="https://example.com/image.jpg">
+                    </div>
+                </div>
+                <div class="error-message hidden" id="propertyError"></div>
+                <button type="submit" class="btn btn-primary btn-full">Save Property</button>
             </form>
         </div>
     </div>
