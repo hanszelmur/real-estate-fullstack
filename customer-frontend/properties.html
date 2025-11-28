@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Properties - Real Estate</title>
+    <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+    <!-- Navigation -->
+    <nav class="navbar">
+        <div class="nav-brand">
+            <a href="index.html">🏠 Real Estate</a>
+        </div>
+        <div class="nav-links">
+            <a href="index.html" class="nav-link">Home</a>
+            <a href="properties.html" class="nav-link active">Properties</a>
+            <a href="#" class="nav-link" id="loginLink">Login</a>
+            <a href="#" class="nav-link" id="registerLink">Register</a>
+            <a href="appointments.html" class="nav-link hidden" id="appointmentsLink">My Appointments</a>
+            <a href="#" class="nav-link hidden" id="logoutLink">Logout</a>
+        </div>
+        <div class="user-info hidden" id="userInfo">
+            <span id="userName"></span>
+        </div>
+    </nav>
+
+    <!-- Page Header -->
+    <section class="page-header">
+        <div class="container">
+            <h1>Browse Properties</h1>
+            <p>Find your perfect home from our listings</p>
+        </div>
+    </section>
+
+    <!-- Filters -->
+    <section class="filters-section">
+        <div class="container">
+            <div class="filters">
+                <div class="filter-group">
+                    <label>City</label>
+                    <input type="text" id="filterCity" placeholder="Any city">
+                </div>
+                <div class="filter-group">
+                    <label>Property Type</label>
+                    <select id="filterType">
+                        <option value="">All Types</option>
+                        <option value="house">House</option>
+                        <option value="apartment">Apartment</option>
+                        <option value="condo">Condo</option>
+                        <option value="land">Land</option>
+                        <option value="commercial">Commercial</option>
+                    </select>
+                </div>
+                <div class="filter-group">
+                    <label>Listing Type</label>
+                    <select id="filterListingType">
+                        <option value="">All</option>
+                        <option value="sale">For Sale</option>
+                        <option value="rent">For Rent</option>
+                    </select>
+                </div>
+                <div class="filter-group">
+                    <label>Min Price</label>
+                    <input type="number" id="filterMinPrice" placeholder="Min">
+                </div>
+                <div class="filter-group">
+                    <label>Max Price</label>
+                    <input type="number" id="filterMaxPrice" placeholder="Max">
+                </div>
+                <div class="filter-group">
+                    <label>Bedrooms</label>
+                    <select id="filterBedrooms">
+                        <option value="">Any</option>
+                        <option value="1">1+</option>
+                        <option value="2">2+</option>
+                        <option value="3">3+</option>
+                        <option value="4">4+</option>
+                        <option value="5">5+</option>
+                    </select>
+                </div>
+                <button class="btn btn-primary" onclick="applyFilters()">Search</button>
+                <button class="btn btn-secondary" onclick="clearFilters()">Clear</button>
+            </div>
+        </div>
+    </section>
+
+    <!-- Property Listings -->
+    <section class="section">
+        <div class="container">
+            <div class="results-info">
+                <span id="resultsCount">Loading...</span>
+            </div>
+            <div class="property-grid" id="propertyList">
+                <div class="loading">Loading properties...</div>
+            </div>
+            <!-- Pagination -->
+            <div class="pagination" id="pagination"></div>
+        </div>
+    </section>
+
+    <!-- Login Modal (copy from index.html for consistency) -->
+    <div class="modal" id="loginModal">
+        <div class="modal-content">
+            <span class="close" onclick="closeModal('loginModal')">&times;</span>
+            <h2>Login</h2>
+            <form id="loginForm" onsubmit="handleLogin(event)">
+                <div class="form-group">
+                    <label for="loginEmail">Email</label>
+                    <input type="email" id="loginEmail" required>
+                </div>
+                <div class="form-group">
+                    <label for="loginPassword">Password</label>
+                    <input type="password" id="loginPassword" required>
+                </div>
+                <div class="error-message hidden" id="loginError"></div>
+                <button type="submit" class="btn btn-primary btn-full">Login</button>
+            </form>
+            <p class="text-center">Don't have an account? <a href="#" onclick="switchToRegister()">Register</a></p>
+        </div>
+    </div>
+
+    <!-- Register Modal -->
+    <div class="modal" id="registerModal">
+        <div class="modal-content">
+            <span class="close" onclick="closeModal('registerModal')">&times;</span>
+            <h2>Create Account</h2>
+            <form id="registerForm" onsubmit="handleRegister(event)">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="registerFirstName">First Name</label>
+                        <input type="text" id="registerFirstName" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="registerLastName">Last Name</label>
+                        <input type="text" id="registerLastName" required>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label for="registerEmail">Email</label>
+                    <input type="email" id="registerEmail" required>
+                </div>
+                <div class="form-group">
+                    <label for="registerPhone">Phone Number</label>
+                    <input type="tel" id="registerPhone" placeholder="+1-555-555-5555" required>
+                </div>
+                <div class="form-group">
+                    <label for="registerPassword">Password</label>
+                    <input type="password" id="registerPassword" required minlength="6">
+                    <small>At least 6 characters with letters and numbers</small>
+                </div>
+                <div class="error-message hidden" id="registerError"></div>
+                <button type="submit" class="btn btn-primary btn-full">Register</button>
+            </form>
+            <p class="text-center">Already have an account? <a href="#" onclick="switchToLogin()">Login</a></p>
+        </div>
+    </div>
+
+    <!-- Verification Modal -->
+    <div class="modal" id="verifyModal">
+        <div class="modal-content">
+            <span class="close" onclick="closeModal('verifyModal')">&times;</span>
+            <h2>Verify Your Phone</h2>
+            <p>We've sent a verification code to <span id="verifyPhone"></span></p>
+            <form id="verifyForm" onsubmit="handleVerify(event)">
+                <div class="form-group">
+                    <label for="verifyCode">Verification Code</label>
+                    <input type="text" id="verifyCode" maxlength="6" placeholder="Enter 6-digit code" required>
+                </div>
+                <div class="error-message hidden" id="verifyError"></div>
+                <button type="submit" class="btn btn-primary btn-full">Verify</button>
+            </form>
+            <p class="text-center">
+                <a href="#" onclick="resendCode()">Resend Code</a>
+            </p>
+        </div>
+    </div>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <div class="container">
+            <p>&copy; 2024 Real Estate. Customer Portal.</p>
+        </div>
+    </footer>
+
+    <script src="js/config.js"></script>
+    <script src="js/api.js"></script>
+    <script src="js/auth.js"></script>
+    <script src="js/properties.js"></script>
+</body>
+</html>

@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>My Appointments - Real Estate</title>
+    <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+    <!-- Navigation -->
+    <nav class="navbar">
+        <div class="nav-brand">
+            <a href="index.html">🏠 Real Estate</a>
+        </div>
+        <div class="nav-links">
+            <a href="index.html" class="nav-link">Home</a>
+            <a href="properties.html" class="nav-link">Properties</a>
+            <a href="#" class="nav-link hidden" id="loginLink">Login</a>
+            <a href="#" class="nav-link hidden" id="registerLink">Register</a>
+            <a href="appointments.html" class="nav-link active" id="appointmentsLink">My Appointments</a>
+            <a href="#" class="nav-link" id="logoutLink">Logout</a>
+        </div>
+        <div class="user-info" id="userInfo">
+            <span id="userName"></span>
+        </div>
+    </nav>
+
+    <!-- Page Header -->
+    <section class="page-header">
+        <div class="container">
+            <h1>My Appointments</h1>
+            <p>View and manage your property viewing appointments</p>
+        </div>
+    </section>
+
+    <!-- Appointments List -->
+    <section class="section">
+        <div class="container">
+            <div class="tabs">
+                <button class="tab active" onclick="filterAppointments('all')">All</button>
+                <button class="tab" onclick="filterAppointments('pending')">Pending</button>
+                <button class="tab" onclick="filterAppointments('confirmed')">Confirmed</button>
+                <button class="tab" onclick="filterAppointments('completed')">Completed</button>
+                <button class="tab" onclick="filterAppointments('cancelled')">Cancelled</button>
+            </div>
+            
+            <div class="appointments-list" id="appointmentsList">
+                <div class="loading">Loading appointments...</div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <div class="container">
+            <p>&copy; 2024 Real Estate. Customer Portal.</p>
+        </div>
+    </footer>
+
+    <script src="js/config.js"></script>
+    <script src="js/api.js"></script>
+    <script src="js/auth.js"></script>
+    <script src="js/appointments.js"></script>
+</body>
+</html>

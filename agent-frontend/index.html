@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Agent Portal - Real Estate</title>
+    <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+    <!-- Login Screen (shown when not authenticated) -->
+    <div class="login-screen" id="loginScreen">
+        <div class="login-container">
+            <div class="login-header">
+                <h1>🏠 Agent Portal</h1>
+                <p>Real Estate Management System</p>
+            </div>
+            <form id="loginForm" onsubmit="handleLogin(event)">
+                <div class="form-group">
+                    <label for="loginEmail">Email</label>
+                    <input type="email" id="loginEmail" required placeholder="agent@realestate.com">
+                </div>
+                <div class="form-group">
+                    <label for="loginPassword">Password</label>
+                    <input type="password" id="loginPassword" required placeholder="Enter password">
+                </div>
+                <div class="error-message hidden" id="loginError"></div>
+                <button type="submit" class="btn btn-primary btn-full">Login</button>
+            </form>
+            <p class="login-note">⚠️ Agent accounts are created by administrators only.</p>
+        </div>
+    </div>
+
+    <!-- Main Dashboard (shown when authenticated) -->
+    <div class="dashboard hidden" id="dashboard">
+        <!-- Navigation -->
+        <nav class="navbar">
+            <div class="nav-brand">
+                <a href="index.html">🏠 Agent Portal</a>
+            </div>
+            <div class="nav-links">
+                <a href="#" class="nav-link active" data-page="dashboard">Dashboard</a>
+                <a href="#" class="nav-link" data-page="properties">My Properties</a>
+                <a href="#" class="nav-link" data-page="appointments">Appointments</a>
+            </div>
+            <div class="user-info">
+                <span id="userName"></span>
+                <button class="btn btn-secondary btn-sm" onclick="handleLogout()">Logout</button>
+            </div>
+        </nav>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <!-- Dashboard Page -->
+            <div class="page active" id="dashboardPage">
+                <div class="page-header">
+                    <h1>Dashboard</h1>
+                    <p>Welcome back! Here's your overview.</p>
+                </div>
+                
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <div class="stat-value" id="statProperties">-</div>
+                        <div class="stat-label">Assigned Properties</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value" id="statPending">-</div>
+                        <div class="stat-label">Pending Appointments</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value" id="statConfirmed">-</div>
+                        <div class="stat-label">Confirmed Today</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value" id="statCompleted">-</div>
+                        <div class="stat-label">Completed This Month</div>
+                    </div>
+                </div>
+
+                <div class="dashboard-sections">
+                    <div class="section-card">
+                        <h3>Upcoming Appointments</h3>
+                        <div id="upcomingAppointments" class="appointment-list">
+                            <div class="loading">Loading...</div>
+                        </div>
+                    </div>
+                    <div class="section-card">
+                        <h3>Recent Notifications</h3>
+                        <div id="recentNotifications" class="notification-list">
+                            <div class="loading">Loading...</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Properties Page -->
+            <div class="page" id="propertiesPage">
+                <div class="page-header">
+                    <h1>My Properties</h1>
+                    <p>Properties assigned to you</p>
+                </div>
+                
+                <div class="property-list" id="propertyList">
+                    <div class="loading">Loading properties...</div>
+                </div>
+            </div>
+
+            <!-- Appointments Page -->
+            <div class="page" id="appointmentsPage">
+                <div class="page-header">
+                    <h1>Appointments</h1>
+                    <p>Manage your property viewing appointments</p>
+                </div>
+                
+                <div class="tabs">
+                    <button class="tab active" onclick="filterAppointments('pending')">Pending</button>
+                    <button class="tab" onclick="filterAppointments('confirmed')">Confirmed</button>
+                    <button class="tab" onclick="filterAppointments('completed')">Completed</button>
+                    <button class="tab" onclick="filterAppointments('cancelled')">Cancelled</button>
+                    <button class="tab" onclick="filterAppointments('')">All</button>
+                </div>
+                
+                <div class="appointments-list" id="appointmentsList">
+                    <div class="loading">Loading appointments...</div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Update Appointment Modal -->
+    <div class="modal" id="appointmentModal">
+        <div class="modal-content">
+            <span class="close" onclick="closeModal('appointmentModal')">&times;</span>
+            <h2>Update Appointment</h2>
+            <form id="appointmentForm" onsubmit="updateAppointment(event)">
+                <input type="hidden" id="appointmentId">
+                <div class="form-group">
+                    <label>Property</label>
+                    <p id="modalPropertyTitle" class="form-value"></p>
+                </div>
+                <div class="form-group">
+                    <label>Customer</label>
+                    <p id="modalCustomerName" class="form-value"></p>
+                    <p id="modalCustomerContact" class="form-value-small"></p>
+                </div>
+                <div class="form-group">
+                    <label for="appointmentStatus">Status</label>
+                    <select id="appointmentStatus" required>
+                        <option value="pending">Pending</option>
+                        <option value="confirmed">Confirmed</option>
+                        <option value="completed">Completed</option>
+                        <option value="cancelled">Cancelled</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="appointmentDate">Date</label>
+                    <input type="date" id="appointmentDate" required>
+                </div>
+                <div class="form-group">
+                    <label for="appointmentTime">Time</label>
+                    <input type="time" id="appointmentTime" required>
+                </div>
+                <div class="form-group">
+                    <label for="appointmentNotes">Notes</label>
+                    <textarea id="appointmentNotes" rows="3"></textarea>
+                </div>
+                <div class="error-message hidden" id="appointmentError"></div>
+                <button type="submit" class="btn btn-primary btn-full">Update Appointment</button>
+            </form>
+        </div>
+    </div>
+
+    <script src="js/config.js"></script>
+    <script src="js/api.js"></script>
+    <script src="js/app.js"></script>
+</body>
+</html>
