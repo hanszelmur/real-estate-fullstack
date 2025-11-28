@@ -162,11 +162,14 @@ function escapeHtml(str) {
 }
 
 /**
- * Escape quotes for inline JS
+ * Escape quotes and backslashes for inline JS
  */
 function escapeQuotes(str) {
-    if (!str) return '';
-    return str.replace(/'/g, "\\'").replace(/"/g, '\\"');
+    if (str === null || str === undefined) return '';
+    return String(str)
+        .replace(/\\/g, '\\\\')  // Escape backslashes first
+        .replace(/'/g, "\\'")
+        .replace(/"/g, '\\"');
 }
 
 /**

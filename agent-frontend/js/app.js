@@ -278,6 +278,28 @@ function renderNotifications(notifications) {
 }
 
 /**
+ * Validate URL is a safe image URL
+ * Allows only http/https URLs with valid format
+ */
+function isValidImageUrl(url) {
+    if (!url) return false;
+    try {
+        const parsed = new URL(url);
+        // Only allow http and https protocols
+        if (!['http:', 'https:'].includes(parsed.protocol)) {
+            return false;
+        }
+        // Basic check for valid hostname
+        if (!parsed.hostname || parsed.hostname.length < 3) {
+            return false;
+        }
+        return true;
+    } catch {
+        return false;
+    }
+}
+
+/**
  * Load properties assigned to agent
  */
 async function loadProperties() {
@@ -308,7 +330,7 @@ async function loadProperties() {
                 ${propertiesData.map(property => `
                     <div class="property-card">
                         <div class="property-image">
-                            ${property.image_url && /^https?:\/\//i.test(property.image_url) ? `<img src="${property.image_url}" alt="${escapeHtml(property.title)}">` : '🏠'}
+                            ${isValidImageUrl(property.image_url) ? `<img src="${property.image_url}" alt="${escapeHtml(property.title)}">` : '🏠'}
                         </div>
                         <div class="property-info">
                             <h3 class="property-title">${escapeHtml(property.title)}</h3>

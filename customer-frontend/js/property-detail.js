@@ -250,6 +250,9 @@ function scheduleViewing() {
     openModal('bookingModal');
 }
 
+// UI Constants
+const BOOKING_SUCCESS_DISPLAY_MS = 3000;
+
 /**
  * Handle booking form submission
  */
@@ -296,7 +299,7 @@ async function handleBooking(event) {
         // Close modal after a delay
         setTimeout(() => {
             closeModal('bookingModal');
-        }, 3000);
+        }, BOOKING_SUCCESS_DISPLAY_MS);
     } else {
         errorDiv.textContent = response.data.error || 'Failed to submit request. Please try again.';
         errorDiv.classList.remove('hidden');

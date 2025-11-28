@@ -391,8 +391,10 @@ router.post('/', authenticate, requireVerified, async (req, res) => {
             });
         }
         
-        // Record precise booking timestamp
-        const bookingTimestamp = new Date().toISOString().slice(0, 23).replace('T', ' ');
+        // Record precise booking timestamp with microsecond precision for MySQL DATETIME(6)
+        const now = new Date();
+        const bookingTimestamp = now.toISOString().slice(0, 23).replace('T', ' ') + 
+            String(now.getMilliseconds()).padStart(3, '0').substring(0, 3);
         
         // Check if slot is already confirmed
         const existingConfirmedBookings = await db.query(`

@@ -124,13 +124,16 @@ router.post('/', authenticate, requireVerified, async (req, res) => {
             VALUES (?, ?, ?, ?, ?)
         `, [appointment.agent_id, user.id, appointmentId, ratingValue, feedback || null]);
         
-        // Create notification for the agent
+        // Create notification for the agent (sanitize feedback to prevent XSS in notifications)
+        const sanitizedFeedback = feedback ? feedback.replace(/[<>]/g, '').substring(0, 100) : '';
+        const notificationMessage = `You received a ${ratingValue}-star rating for the viewing of ${appointment.property_title}.${sanitizedFeedback ? ' Customer feedback: "' + sanitizedFeedback + '..."' : ''}`;
+        
         await db.query(`
             INSERT INTO notifications (user_id, type, title, message)
             VALUES (?, 'property', '⭐ New Rating Received', ?)
         `, [
             appointment.agent_id,
-            `You received a ${ratingValue}-star rating for the viewing of ${appointment.property_title}.${feedback ? ' Customer feedback: "' + feedback.substring(0, 100) + '..."' : ''}`
+            notificationMessage
         ]);
         
         res.status(201).json({
