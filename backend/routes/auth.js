@@ -267,6 +267,10 @@ router.post('/resend-code', async (req, res) => {
  * 
  * Body: { email, password }
  * Response: { success, token, user }
+ * 
+ * ⚠️  PRODUCTION NOTE: This endpoint should have rate limiting to prevent
+ * brute force attacks. Consider using express-rate-limit middleware.
+ * Example: app.use('/api/auth/login', rateLimit({ windowMs: 15*60*1000, max: 5 }))
  */
 router.post('/login', async (req, res) => {
     try {

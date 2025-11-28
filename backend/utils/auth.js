@@ -1,8 +1,13 @@
 /**
  * Authentication Utilities
  * 
- * Handles password hashing, verification, and JWT token management.
+ * Handles password hashing, verification, and token management.
  * Uses bcryptjs for secure password hashing.
+ * 
+ * ⚠️  DEVELOPMENT/DEMO ONLY ⚠️
+ * This implementation uses simple Base64 tokens instead of signed JWTs.
+ * For production use, replace with a proper JWT library (jsonwebtoken)
+ * with signed tokens and proper key management.
  */
 
 const bcrypt = require('bcryptjs');
@@ -10,7 +15,8 @@ const bcrypt = require('bcryptjs');
 // Salt rounds for bcrypt (higher = more secure but slower)
 const SALT_ROUNDS = 10;
 
-// JWT secret from environment (simple token approach without jwt library)
+// Token secret from environment
+// ⚠️  In production, always set JWT_SECRET environment variable with a strong random key
 const JWT_SECRET = process.env.JWT_SECRET || 'default-secret-change-in-production';
 
 /**
@@ -35,7 +41,9 @@ const comparePassword = async (password, hash) => {
 /**
  * Generate a simple session token
  * Uses base64 encoding of user data + timestamp + random component
- * Note: For production, use a proper JWT library
+ * 
+ * ⚠️  DEVELOPMENT/DEMO ONLY - NOT SECURE FOR PRODUCTION ⚠️
+ * For production, use a proper JWT library with signed tokens.
  * 
  * @param {object} user - User object with id, email, role
  * @returns {string} - Session token
@@ -50,7 +58,7 @@ const generateToken = (user) => {
     };
     
     // Simple token: base64 encoded JSON
-    // In production, use proper JWT with signing
+    // ⚠️  In production, use proper JWT with HMAC/RSA signing
     const tokenData = JSON.stringify(payload);
     const token = Buffer.from(tokenData).toString('base64');
     

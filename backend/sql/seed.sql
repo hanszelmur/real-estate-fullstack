@@ -1,10 +1,15 @@
 -- ============================================================================
 -- Real Estate Application Seed Data
 -- ============================================================================
--- This script inserts initial data for testing and demo purposes.
+-- This script inserts initial data for DEMO/DEVELOPMENT purposes ONLY.
 -- Includes: admin user, agent users, and sample properties.
 -- 
--- DEFAULT CREDENTIALS (change in production!):
+-- ⚠️  SECURITY WARNING - FOR DEVELOPMENT/DEMO USE ONLY ⚠️
+-- These credentials are hardcoded and publicly known.
+-- NEVER use these credentials in a production environment!
+-- Create new admin/agent accounts with strong passwords before deployment.
+-- 
+-- DEFAULT CREDENTIALS (CHANGE BEFORE PRODUCTION!):
 -- Admin: admin@realestate.com / admin123
 -- Agent1: agent1@realestate.com / agent123
 -- Agent2: agent2@realestate.com / agent123

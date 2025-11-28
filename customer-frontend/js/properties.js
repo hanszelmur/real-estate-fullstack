@@ -7,6 +7,18 @@
 let currentPage = 1;
 const pageSize = 12;
 
+/**
+ * Escape HTML special characters to prevent XSS
+ * @param {string} str - String to escape
+ * @returns {string} - Escaped string
+ */
+function escapeHtml(str) {
+    if (!str) return '';
+    const div = document.createElement('div');
+    div.textContent = str;
+    return div.innerHTML;
+}
+
 document.addEventListener('DOMContentLoaded', () => {
     // Check URL params for pre-filled filters
     const urlParams = new URLSearchParams(window.location.search);
@@ -79,18 +91,29 @@ function createPropertyCard(property) {
     const badgeClass = property.featured ? 'featured' : (property.listing_type === 'rent' ? 'rent' : '');
     const badgeText = property.featured ? 'Featured' : (property.listing_type === 'rent' ? 'For Rent' : 'For Sale');
     
+    // Escape user-controlled content to prevent XSS
+    const safeTitle = escapeHtml(property.title);
+    const safeAddress = escapeHtml(property.address);
+    const safeCity = escapeHtml(property.city);
+    const safeState = escapeHtml(property.state);
+    
+    // For image URL, only allow http/https URLs
+    const safeImageUrl = property.image_url && /^https?:\/\//i.test(property.image_url) 
+        ? property.image_url 
+        : null;
+    
     return `
-        <div class="property-card" onclick="viewProperty(${property.id})">
+        <div class="property-card" onclick="viewProperty(${parseInt(property.id)})">
             <div class="property-image">
-                ${property.image_url 
-                    ? `<img src="${property.image_url}" alt="${property.title}">`
+                ${safeImageUrl 
+                    ? `<img src="${safeImageUrl}" alt="${safeTitle}">`
                     : '🏠'}
                 <span class="property-badge ${badgeClass}">${badgeText}</span>
             </div>
             <div class="property-info">
                 <div class="property-price">${priceDisplay}</div>
-                <h3 class="property-title">${property.title}</h3>
-                <p class="property-address">${property.address}, ${property.city}, ${property.state}</p>
+                <h3 class="property-title">${safeTitle}</h3>
+                <p class="property-address">${safeAddress}, ${safeCity}, ${safeState}</p>
                 <div class="property-features">
                     ${property.bedrooms > 0 ? `<span>🛏️ ${property.bedrooms} Beds</span>` : ''}
                     ${property.bathrooms > 0 ? `<span>🛁 ${property.bathrooms} Baths</span>` : ''}

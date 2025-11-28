@@ -6,6 +6,18 @@
 
 let currentProperty = null;
 
+/**
+ * Escape HTML special characters to prevent XSS
+ * @param {string} str - String to escape
+ * @returns {string} - Escaped string
+ */
+function escapeHtml(str) {
+    if (!str) return '';
+    const div = document.createElement('div');
+    div.textContent = str;
+    return div.innerHTML;
+}
+
 document.addEventListener('DOMContentLoaded', () => {
     loadPropertyDetail();
     setupDatePicker();
@@ -47,22 +59,39 @@ function renderPropertyDetail(property) {
     
     const typeLabel = property.listing_type === 'rent' ? 'For Rent' : 'For Sale';
     
+    // Escape user-controlled content to prevent XSS
+    const safeTitle = escapeHtml(property.title);
+    const safeAddress = escapeHtml(property.address);
+    const safeCity = escapeHtml(property.city);
+    const safeState = escapeHtml(property.state);
+    const safeZipCode = escapeHtml(property.zip_code);
+    const safeDescription = escapeHtml(property.description);
+    const safeAgentFirstName = escapeHtml(property.agent_first_name);
+    const safeAgentLastName = escapeHtml(property.agent_last_name);
+    const safeAgentEmail = escapeHtml(property.agent_email);
+    const safeAgentPhone = escapeHtml(property.agent_phone);
+    
+    // For image URL, only allow http/https URLs to prevent javascript: injection
+    const safeImageUrl = property.image_url && /^https?:\/\//i.test(property.image_url) 
+        ? property.image_url 
+        : null;
+    
     container.innerHTML = `
         <div class="property-detail-image">
-            ${property.image_url 
-                ? `<img src="${property.image_url}" alt="${property.title}">`
+            ${safeImageUrl 
+                ? `<img src="${safeImageUrl}" alt="${safeTitle}">`
                 : '🏠'}
         </div>
         <div class="property-detail-content">
             <div class="property-detail-header">
                 <div>
                     <span class="property-badge ${property.listing_type}">${typeLabel}</span>
-                    <h1 class="property-detail-title">${property.title}</h1>
+                    <h1 class="property-detail-title">${safeTitle}</h1>
                 </div>
                 <div class="property-detail-price">${priceDisplay}</div>
             </div>
             
-            <p class="property-detail-address">📍 ${property.address}, ${property.city}, ${property.state} ${property.zip_code}</p>
+            <p class="property-detail-address">📍 ${safeAddress}, ${safeCity}, ${safeState} ${safeZipCode}</p>
             
             <div class="property-detail-features">
                 ${property.bedrooms > 0 ? `
@@ -101,19 +130,19 @@ function renderPropertyDetail(property) {
                 </div>
             </div>
             
-            ${property.description ? `
+            ${safeDescription ? `
                 <div class="property-description">
                     <h3>Description</h3>
-                    <p>${property.description}</p>
+                    <p>${safeDescription}</p>
                 </div>
             ` : ''}
             
-            ${property.agent_first_name ? `
+            ${safeAgentFirstName ? `
                 <div class="agent-info">
                     <h3>Listing Agent</h3>
-                    <p><strong>${property.agent_first_name} ${property.agent_last_name}</strong></p>
-                    <p>📧 ${property.agent_email}</p>
-                    <p>📞 ${property.agent_phone}</p>
+                    <p><strong>${safeAgentFirstName} ${safeAgentLastName}</strong></p>
+                    <p>📧 ${safeAgentEmail}</p>
+                    <p>📞 ${safeAgentPhone}</p>
                 </div>
             ` : ''}
             
