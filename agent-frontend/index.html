@@ -253,10 +253,17 @@
                         </select>
                     </div>
                     <div class="form-group">
-                        <label for="propertyImageUrl">Image URL</label>
+                        <label for="propertyImageUrl">Image URL (optional, legacy)</label>
                         <input type="url" id="propertyImageUrl" placeholder="https://example.com/image.jpg">
                     </div>
                 </div>
+                <div class="form-group">
+                    <label for="propertyImages">Upload Images</label>
+                    <input type="file" id="propertyImages" accept="image/*" multiple>
+                    <small class="form-help">Select one or more images (max 5MB each, max 10 files)</small>
+                </div>
+                <div id="imagePreview" class="image-preview-container"></div>
+                <div id="existingPhotos" class="existing-photos-container"></div>
                 <div class="error-message hidden" id="propertyError"></div>
                 <button type="submit" class="btn btn-primary btn-full">Save Property</button>
             </form>

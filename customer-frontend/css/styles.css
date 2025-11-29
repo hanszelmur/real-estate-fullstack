@@ -860,3 +860,122 @@ a {
         flex-direction: column;
     }
 }
+
+/* ============================================================================
+   Property Image Gallery Styles
+   ============================================================================ */
+
+/* Gallery Container */
+.property-gallery {
+    position: relative;
+    margin-bottom: 20px;
+}
+
+.gallery-main {
+    position: relative;
+    height: 400px;
+    background: #f0f2f5;
+    border-radius: 10px;
+    overflow: hidden;
+}
+
+.gallery-main img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+/* Gallery Navigation Buttons */
+.gallery-nav-btn {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    background: rgba(0, 0, 0, 0.5);
+    color: white;
+    border: none;
+    padding: 15px 10px;
+    cursor: pointer;
+    font-size: 1.2rem;
+    z-index: 10;
+    transition: background 0.3s;
+}
+
+.gallery-nav-btn:hover {
+    background: rgba(0, 0, 0, 0.8);
+}
+
+.gallery-prev {
+    left: 10px;
+    border-radius: 0 5px 5px 0;
+}
+
+.gallery-next {
+    right: 10px;
+    border-radius: 5px 0 0 5px;
+}
+
+/* Gallery Thumbnails */
+.gallery-thumbnails {
+    display: flex;
+    gap: 10px;
+    margin-top: 10px;
+    padding: 5px 0;
+    overflow-x: auto;
+}
+
+.gallery-thumb {
+    flex-shrink: 0;
+    width: 80px;
+    height: 60px;
+    border-radius: 5px;
+    overflow: hidden;
+    cursor: pointer;
+    border: 2px solid transparent;
+    transition: border-color 0.3s;
+}
+
+.gallery-thumb:hover {
+    border-color: #3498db;
+}
+
+.gallery-thumb.active {
+    border-color: #27ae60;
+}
+
+.gallery-thumb img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+/* No Image Placeholder */
+.property-detail-image.no-image {
+    height: 300px;
+    background: linear-gradient(135deg, #667eea, #764ba2);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 10px;
+}
+
+.property-detail-image.no-image .placeholder-icon {
+    font-size: 5rem;
+    color: white;
+}
+
+/* Responsive Gallery */
+@media (max-width: 768px) {
+    .gallery-main {
+        height: 250px;
+    }
+    
+    .gallery-thumb {
+        width: 60px;
+        height: 45px;
+    }
+    
+    .gallery-nav-btn {
+        padding: 10px 8px;
+        font-size: 1rem;
+    }
+}

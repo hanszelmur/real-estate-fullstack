@@ -231,3 +231,26 @@ CREATE TABLE IF NOT EXISTS blocked_slots (
     FOREIGN KEY (blocked_by) REFERENCES users(id) ON DELETE SET NULL,
     UNIQUE KEY unique_blocked_slot (property_id, blocked_date, blocked_time)
 );
+
+-- ============================================================================
+-- PROPERTY_PHOTOS TABLE
+-- ============================================================================
+-- Stores uploaded property images (supports multiple images per property)
+-- filename: Name of the file stored on disk (e.g., property-1-1234567890.jpg)
+-- is_primary: Flag to indicate main property image shown in listings
+-- display_order: Order in which images appear in gallery (lower = first)
+-- ============================================================================
+CREATE TABLE IF NOT EXISTS property_photos (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    property_id INT NOT NULL,
+    filename VARCHAR(255) NOT NULL,
+    original_filename VARCHAR(255),
+    is_primary BOOLEAN DEFAULT FALSE,
+    display_order INT DEFAULT 0,
+    uploaded_by INT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_property (property_id),
+    INDEX idx_primary (property_id, is_primary),
+    FOREIGN KEY (property_id) REFERENCES properties(id) ON DELETE CASCADE,
+    FOREIGN KEY (uploaded_by) REFERENCES users(id) ON DELETE SET NULL
+);

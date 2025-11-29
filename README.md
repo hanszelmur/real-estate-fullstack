@@ -64,7 +64,9 @@ This is a **production-ready fullstack starter** for building real estate platfo
 | **Property Types** | House, Apartment, Condo, Land, Commercial | All |
 | **Listing Types** | For Sale, For Rent | All |
 | **Rich Details** | Bedrooms, bathrooms, square feet, lot size, year built | All |
-| **Image URLs** | Support for property photos | Admin, Agent |
+| **Image Upload** | Upload multiple images per property via multipart/form-data | Admin, Agent |
+| **Image Gallery** | Display property images in a browsable gallery | All |
+| **Legacy Image URLs** | Backward compatible support for external image URLs | Admin, Agent |
 
 ### 📅 Booking System (Second-Level Precision)
 | Feature | Description |
@@ -680,10 +682,34 @@ serve admin-frontend -l 3003
 |--------|----------|-------------|--------|
 | `GET` | `/api/properties` | List properties (filtered by role) | Public |
 | `GET` | `/api/properties/featured` | Get featured properties | Public |
-| `GET` | `/api/properties/:id` | Get property details | Public |
+| `GET` | `/api/properties/:id` | Get property details (includes photos) | Public |
 | `POST` | `/api/properties` | Create property | Admin/Agent |
 | `PUT` | `/api/properties/:id` | Update property | Admin/Agent (own) |
 | `DELETE` | `/api/properties/:id` | Delete property | Admin |
+
+### Property Photos Endpoints
+
+| Method | Endpoint | Description | Access |
+|--------|----------|-------------|--------|
+| `GET` | `/api/properties/:id/photos` | Get all photos for a property | Public |
+| `POST` | `/api/properties/:id/photos` | Upload photos (multipart/form-data) | Admin/Agent (own) |
+| `PUT` | `/api/properties/:propertyId/photos/:photoId/primary` | Set photo as primary | Admin/Agent (own) |
+| `DELETE` | `/api/properties/:propertyId/photos/:photoId` | Delete a photo | Admin/Agent (own) |
+
+**Photo Upload Example:**
+```bash
+# Upload images using curl
+curl -X POST http://localhost:3000/api/properties/1/photos \
+  -H "Authorization: Bearer YOUR_TOKEN" \
+  -F "images=@/path/to/image1.jpg" \
+  -F "images=@/path/to/image2.jpg"
+```
+
+**Accessing Uploaded Images:**
+```
+# Images are served as static files
+http://localhost:3000/uploads/images/filename.jpg
+```
 
 ### Appointments Endpoints
 
@@ -741,6 +767,7 @@ serve admin-frontend -l 3003
 | `users` | All user accounts | Role enum, verification status, activation |
 | `verifications` | Phone verification codes | 10-minute expiry, one-time use |
 | `properties` | Property listings | Type/status enums, agent assignment, featured flag |
+| `property_photos` | Uploaded property images | Multiple images per property, primary flag, display order |
 | `appointments` | Booking records | `DATETIME(6)` precision, queue position |
 | `agent_ratings` | Customer ratings | 1-5 scale, unique per appointment |
 | `agent_assignments` | Assignment history | Status tracking (active/completed/reassigned) |

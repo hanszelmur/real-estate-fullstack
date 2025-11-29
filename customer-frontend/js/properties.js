@@ -81,6 +81,23 @@ async function loadProperties() {
 }
 
 /**
+ * Get the primary image URL for a property
+ * Prioritizes uploaded photos over legacy image_url
+ */
+function getPropertyImageUrl(property) {
+    // Check for uploaded photos first (photos array from API if available)
+    if (property.photos && property.photos.length > 0) {
+        const primaryPhoto = property.photos.find(p => p.is_primary) || property.photos[0];
+        return `${CONFIG.API_URL.replace('/api', '')}/uploads/images/${primaryPhoto.filename}`;
+    }
+    // Fall back to legacy image_url
+    if (property.image_url && /^https?:\/\//i.test(property.image_url)) {
+        return property.image_url;
+    }
+    return null;
+}
+
+/**
  * Create HTML for a property card
  */
 function createPropertyCard(property) {
@@ -97,10 +114,8 @@ function createPropertyCard(property) {
     const safeCity = escapeHtml(property.city);
     const safeState = escapeHtml(property.state);
     
-    // For image URL, only allow http/https URLs
-    const safeImageUrl = property.image_url && /^https?:\/\//i.test(property.image_url) 
-        ? property.image_url 
-        : null;
+    // Get the property image URL (uploaded or legacy)
+    const safeImageUrl = getPropertyImageUrl(property);
     
     return `
         <div class="property-card" onclick="viewProperty(${parseInt(property.id)})">

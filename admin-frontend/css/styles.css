@@ -518,3 +518,111 @@ body {
         padding: 10px;
     }
 }
+
+/* ============================================================================
+   Image Upload and Gallery Styles
+   ============================================================================ */
+
+/* Form help text */
+.form-help {
+    color: #666;
+    font-size: 0.85rem;
+    margin-top: 5px;
+    display: block;
+}
+
+/* Image Preview Container */
+.image-preview-container {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-top: 10px;
+    margin-bottom: 15px;
+}
+
+.image-preview-item {
+    position: relative;
+    width: 100px;
+    height: 100px;
+    border-radius: 5px;
+    overflow: hidden;
+    border: 2px solid #ddd;
+}
+
+.image-preview-item img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+/* Existing Photos Container */
+.existing-photos-container {
+    margin-top: 15px;
+    margin-bottom: 15px;
+}
+
+.existing-photos-container h4 {
+    margin-bottom: 10px;
+    color: #1a1a2e;
+    font-size: 0.95rem;
+}
+
+.existing-photos-grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+}
+
+.existing-photo-item {
+    position: relative;
+    width: 100px;
+    height: 100px;
+    border-radius: 5px;
+    overflow: hidden;
+    border: 2px solid #ddd;
+}
+
+.existing-photo-item.primary {
+    border-color: #27ae60;
+}
+
+.existing-photo-item img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.existing-photo-item .photo-actions {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background: rgba(0, 0, 0, 0.7);
+    padding: 4px;
+    display: flex;
+    justify-content: space-around;
+}
+
+.existing-photo-item .photo-actions button {
+    background: transparent;
+    border: none;
+    color: white;
+    cursor: pointer;
+    font-size: 12px;
+    padding: 2px 5px;
+}
+
+.existing-photo-item .photo-actions button:hover {
+    color: #3498db;
+}
+
+.existing-photo-item .primary-badge {
+    position: absolute;
+    top: 2px;
+    left: 2px;
+    background: #27ae60;
+    color: white;
+    font-size: 10px;
+    padding: 2px 5px;
+    border-radius: 3px;
+}

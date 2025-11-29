@@ -10,6 +10,7 @@ let agentsData = [];
 document.addEventListener('DOMContentLoaded', () => {
     checkAuth();
     setupNavigation();
+    setupImagePreview();
 });
 
 /**
@@ -301,10 +302,12 @@ function showAddPropertyModal() {
     document.getElementById('propertyId').value = '';
     document.getElementById('propertyModalTitle').textContent = 'Add Property';
     updateAgentDropdowns();
+    clearImagePreview();
+    clearExistingPhotos();
     openModal('propertyModal');
 }
 
-function editProperty(propertyId) {
+async function editProperty(propertyId) {
     const property = propertiesData.find(p => p.id === propertyId);
     if (!property) return;
     
@@ -328,6 +331,11 @@ function editProperty(propertyId) {
     document.getElementById('propertyAgent').value = property.assigned_agent_id || '';
     
     document.getElementById('propertyModalTitle').textContent = 'Edit Property';
+    clearImagePreview();
+    
+    // Load existing photos
+    await loadExistingPhotos(propertyId);
+    
     openModal('propertyModal');
 }
 
@@ -361,6 +369,14 @@ async function saveProperty(event) {
         : await API.post('/properties', data);
     
     if (response.ok) {
+        const propertyId = id || response.data.property.id;
+        
+        // Upload images if any were selected
+        const imageInput = document.getElementById('propertyImages');
+        if (imageInput.files && imageInput.files.length > 0) {
+            await uploadPropertyImages(propertyId, imageInput.files);
+        }
+        
         closeModal('propertyModal');
         loadProperties();
         alert(id ? 'Property updated successfully' : 'Property created successfully');
@@ -368,6 +384,147 @@ async function saveProperty(event) {
         errorDiv.textContent = response.data.error || 'Failed to save property';
         errorDiv.classList.remove('hidden');
     }
+}
+
+/**
+ * Upload property images
+ */
+async function uploadPropertyImages(propertyId, files) {
+    const formData = new FormData();
+    for (let i = 0; i < files.length; i++) {
+        formData.append('images', files[i]);
+    }
+    
+    const token = localStorage.getItem(CONFIG.STORAGE_KEYS.TOKEN);
+    
+    try {
+        const response = await fetch(`${CONFIG.API_URL}/properties/${propertyId}/photos`, {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${token}`
+            },
+            body: formData
+        });
+        
+        const data = await response.json();
+        if (!data.success) {
+            console.error('Failed to upload images:', data.error);
+            alert('Property saved, but some images failed to upload: ' + (data.error || 'Unknown error'));
+        }
+    } catch (error) {
+        console.error('Image upload error:', error);
+        alert('Property saved, but image upload failed.');
+    }
+}
+
+/**
+ * Load existing photos for a property
+ */
+async function loadExistingPhotos(propertyId) {
+    const container = document.getElementById('existingPhotos');
+    container.innerHTML = '';
+    
+    const response = await API.get(`/properties/${propertyId}/photos`);
+    
+    if (response.ok && response.data.success && response.data.photos.length > 0) {
+        container.innerHTML = `
+            <h4>Existing Photos</h4>
+            <div class="existing-photos-grid">
+                ${response.data.photos.map(photo => `
+                    <div class="existing-photo-item ${photo.is_primary ? 'primary' : ''}" data-photo-id="${photo.id}">
+                        ${photo.is_primary ? '<span class="primary-badge">Primary</span>' : ''}
+                        <img src="${CONFIG.API_URL.replace('/api', '')}/uploads/images/${photo.filename}" alt="${escapeHtml(photo.original_filename || 'Property photo')}">
+                        <div class="photo-actions">
+                            ${!photo.is_primary ? `<button type="button" onclick="setAsPrimary(${propertyId}, ${photo.id})" title="Set as primary">★</button>` : ''}
+                            <button type="button" onclick="deletePhoto(${propertyId}, ${photo.id})" title="Delete">🗑</button>
+                        </div>
+                    </div>
+                `).join('')}
+            </div>
+        `;
+    }
+}
+
+/**
+ * Clear existing photos display
+ */
+function clearExistingPhotos() {
+    const container = document.getElementById('existingPhotos');
+    if (container) container.innerHTML = '';
+}
+
+/**
+ * Set photo as primary
+ */
+async function setAsPrimary(propertyId, photoId) {
+    const response = await API.put(`/properties/${propertyId}/photos/${photoId}/primary`, {});
+    
+    if (response.ok && response.data.success) {
+        await loadExistingPhotos(propertyId);
+    } else {
+        alert('Failed to set primary photo: ' + (response.data.error || 'Unknown error'));
+    }
+}
+
+/**
+ * Delete a photo
+ */
+async function deletePhoto(propertyId, photoId) {
+    if (!confirm('Are you sure you want to delete this photo?')) return;
+    
+    const response = await API.delete(`/properties/${propertyId}/photos/${photoId}`);
+    
+    if (response.ok && response.data.success) {
+        await loadExistingPhotos(propertyId);
+    } else {
+        alert('Failed to delete photo: ' + (response.data.error || 'Unknown error'));
+    }
+}
+
+/**
+ * Clear image preview
+ */
+function clearImagePreview() {
+    const container = document.getElementById('imagePreview');
+    if (container) container.innerHTML = '';
+    const input = document.getElementById('propertyImages');
+    if (input) input.value = '';
+}
+
+/**
+ * Setup image preview on file input change
+ */
+function setupImagePreview() {
+    const input = document.getElementById('propertyImages');
+    if (input) {
+        input.addEventListener('change', function() {
+            const container = document.getElementById('imagePreview');
+            container.innerHTML = '';
+            
+            if (this.files && this.files.length > 0) {
+                Array.from(this.files).forEach((file, index) => {
+                    const reader = new FileReader();
+                    reader.onload = function(e) {
+                        const div = document.createElement('div');
+                        div.className = 'image-preview-item';
+                        div.innerHTML = `<img src="${e.target.result}" alt="Preview ${index + 1}">`;
+                        container.appendChild(div);
+                    };
+                    reader.readAsDataURL(file);
+                });
+            }
+        });
+    }
+}
+
+/**
+ * Escape HTML for display
+ */
+function escapeHtml(str) {
+    if (!str) return '';
+    const div = document.createElement('div');
+    div.textContent = str;
+    return div.innerHTML;
 }
 
 async function deleteProperty(propertyId) {
