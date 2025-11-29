@@ -97,7 +97,9 @@ CREATE TABLE IF NOT EXISTS properties (
 -- APPOINTMENTS TABLE
 -- ============================================================================
 -- Stores property viewing appointments/bookings
--- status: 'pending', 'confirmed', 'completed', 'cancelled'
+-- status: 'pending', 'confirmed', 'completed', 'cancelled', 'queued'
+-- booking_timestamp: Full datetime with seconds precision for double-booking prevention
+-- queue_position: Position in queue (NULL if confirmed, 0+ if queued)
 -- ============================================================================
 CREATE TABLE IF NOT EXISTS appointments (
     id INT AUTO_INCREMENT PRIMARY KEY,
@@ -106,7 +108,9 @@ CREATE TABLE IF NOT EXISTS appointments (
     agent_id INT,
     appointment_date DATE NOT NULL,
     appointment_time TIME NOT NULL,
-    status ENUM('pending', 'confirmed', 'completed', 'cancelled') DEFAULT 'pending',
+    booking_timestamp DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+    status ENUM('pending', 'confirmed', 'completed', 'cancelled', 'queued') DEFAULT 'pending',
+    queue_position INT DEFAULT NULL,
     notes TEXT,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
@@ -115,6 +119,8 @@ CREATE TABLE IF NOT EXISTS appointments (
     INDEX idx_agent (agent_id),
     INDEX idx_date (appointment_date),
     INDEX idx_status (status),
+    INDEX idx_booking_timestamp (booking_timestamp),
+    INDEX idx_slot (property_id, appointment_date, appointment_time),
     FOREIGN KEY (property_id) REFERENCES properties(id) ON DELETE CASCADE,
     FOREIGN KEY (customer_id) REFERENCES users(id) ON DELETE CASCADE,
     FOREIGN KEY (agent_id) REFERENCES users(id) ON DELETE SET NULL
@@ -179,4 +185,49 @@ CREATE TABLE IF NOT EXISTS agent_assignments (
     FOREIGN KEY (property_id) REFERENCES properties(id) ON DELETE CASCADE,
     FOREIGN KEY (assigned_by) REFERENCES users(id) ON DELETE SET NULL,
     UNIQUE KEY unique_agent_property (agent_id, property_id)
+);
+
+-- ============================================================================
+-- AGENT_RATINGS TABLE
+-- ============================================================================
+-- Stores customer ratings for agents after completed viewings
+-- rating: 1-5 stars
+-- One rating per appointment (after completion), prevents duplicates and self-ratings
+-- ============================================================================
+CREATE TABLE IF NOT EXISTS agent_ratings (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    agent_id INT NOT NULL,
+    customer_id INT NOT NULL,
+    appointment_id INT NOT NULL,
+    rating INT NOT NULL CHECK (rating >= 1 AND rating <= 5),
+    feedback TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_agent (agent_id),
+    INDEX idx_customer (customer_id),
+    INDEX idx_appointment (appointment_id),
+    FOREIGN KEY (agent_id) REFERENCES users(id) ON DELETE CASCADE,
+    FOREIGN KEY (customer_id) REFERENCES users(id) ON DELETE CASCADE,
+    FOREIGN KEY (appointment_id) REFERENCES appointments(id) ON DELETE CASCADE,
+    UNIQUE KEY unique_appointment_rating (appointment_id)
+);
+
+-- ============================================================================
+-- BLOCKED_SLOTS TABLE
+-- ============================================================================
+-- Stores blocked time slots for properties (agent unavailability, maintenance, etc.)
+-- ============================================================================
+CREATE TABLE IF NOT EXISTS blocked_slots (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    property_id INT NOT NULL,
+    blocked_date DATE NOT NULL,
+    blocked_time TIME NOT NULL,
+    reason VARCHAR(255),
+    blocked_by INT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_property (property_id),
+    INDEX idx_date (blocked_date),
+    INDEX idx_slot (property_id, blocked_date, blocked_time),
+    FOREIGN KEY (property_id) REFERENCES properties(id) ON DELETE CASCADE,
+    FOREIGN KEY (blocked_by) REFERENCES users(id) ON DELETE SET NULL,
+    UNIQUE KEY unique_blocked_slot (property_id, blocked_date, blocked_time)
 );

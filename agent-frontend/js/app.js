@@ -1,9 +1,16 @@
 /**
  * Agent Portal Main Application
+ * 
+ * Features:
+ * - Dashboard with stats and upcoming appointments
+ * - Property management (view, add, edit assigned properties)
+ * - Appointment management with status updates
+ * - Agent ratings display
  */
 
 let currentAppointmentFilter = 'pending';
 let appointmentsData = [];
+let propertiesData = [];
 
 document.addEventListener('DOMContentLoaded', () => {
     checkAuth();
@@ -51,6 +58,7 @@ function showDashboard(user) {
     
     // Load initial data
     loadDashboardData();
+    loadAgentRatingSummary();
 }
 
 /**
@@ -142,6 +150,46 @@ function navigateTo(pageName) {
 }
 
 /**
+ * Load agent rating summary
+ */
+async function loadAgentRatingSummary() {
+    const userData = JSON.parse(localStorage.getItem(CONFIG.STORAGE_KEYS.USER));
+    const response = await API.get(`/ratings/agent/${userData.id}/summary`);
+    
+    if (response.ok && response.data.success) {
+        const summary = response.data.summary;
+        const ratingDisplay = document.getElementById('agentRating');
+        if (ratingDisplay) {
+            if (summary.totalRatings > 0) {
+                ratingDisplay.innerHTML = `
+                    <span class="rating-stars">${renderStars(parseFloat(summary.averageRating))}</span>
+                    <span class="rating-value">${summary.averageRating}</span>
+                    <span class="rating-count">(${summary.totalRatings} reviews)</span>
+                `;
+            } else {
+                ratingDisplay.innerHTML = '<span class="no-ratings">No ratings yet</span>';
+            }
+        }
+    }
+}
+
+/**
+ * Render star rating
+ */
+function renderStars(rating) {
+    const fullStars = Math.floor(rating);
+    const hasHalfStar = rating - fullStars >= 0.5;
+    const emptyStars = 5 - fullStars - (hasHalfStar ? 1 : 0);
+    
+    let stars = '';
+    for (let i = 0; i < fullStars; i++) stars += '★';
+    if (hasHalfStar) stars += '½';
+    for (let i = 0; i < emptyStars; i++) stars += '☆';
+    
+    return stars;
+}
+
+/**
  * Load dashboard data
  */
 async function loadDashboardData() {
@@ -203,8 +251,8 @@ function renderUpcomingAppointments(appointments) {
     
     container.innerHTML = appointments.map(apt => `
         <div class="appointment-item ${apt.status}">
-            <strong>${apt.property_title}</strong>
-            <p>${apt.customer_first_name} ${apt.customer_last_name}</p>
+            <strong>${escapeHtml(apt.property_title)}</strong>
+            <p>${escapeHtml(apt.customer_first_name)} ${escapeHtml(apt.customer_last_name)}</p>
             <p>${formatDate(apt.appointment_date)} at ${formatTime(apt.appointment_time)}</p>
         </div>
     `).join('');
@@ -223,10 +271,32 @@ function renderNotifications(notifications) {
     
     container.innerHTML = notifications.map(notif => `
         <div class="notification-item ${notif.is_read ? '' : 'unread'}">
-            <strong>${notif.title}</strong>
-            <p>${notif.message}</p>
+            <strong>${escapeHtml(notif.title)}</strong>
+            <p>${escapeHtml(notif.message)}</p>
         </div>
     `).join('');
+}
+
+/**
+ * Validate URL is a safe image URL
+ * Allows only http/https URLs with valid format
+ */
+function isValidImageUrl(url) {
+    if (!url) return false;
+    try {
+        const parsed = new URL(url);
+        // Only allow http and https protocols
+        if (!['http:', 'https:'].includes(parsed.protocol)) {
+            return false;
+        }
+        // Basic check for valid hostname
+        if (!parsed.hostname || parsed.hostname.length < 3) {
+            return false;
+        }
+        return true;
+    } catch {
+        return false;
+    }
 }
 
 /**
@@ -240,28 +310,123 @@ async function loadProperties() {
     
     if (response.ok && response.data.success) {
         const userData = JSON.parse(localStorage.getItem(CONFIG.STORAGE_KEYS.USER));
-        const myProperties = response.data.properties.filter(p => p.assigned_agent_id === userData.id);
+        propertiesData = response.data.properties.filter(p => p.assigned_agent_id === userData.id);
         
-        if (myProperties.length === 0) {
-            container.innerHTML = '<p class="text-center">No properties assigned to you yet.</p>';
+        if (propertiesData.length === 0) {
+            container.innerHTML = `
+                <p class="text-center">No properties assigned to you yet.</p>
+                <div class="text-center" style="margin-top: 20px;">
+                    <button class="btn btn-primary" onclick="showAddPropertyModal()">+ Add Property</button>
+                </div>
+            `;
             return;
         }
         
-        container.innerHTML = myProperties.map(property => `
-            <div class="property-card">
-                <div class="property-image">
-                    ${property.image_url ? `<img src="${property.image_url}" alt="${property.title}">` : '🏠'}
-                </div>
-                <div class="property-info">
-                    <h3 class="property-title">${property.title}</h3>
-                    <p class="property-address">${property.address}, ${property.city}</p>
-                    <div class="property-price">$${formatPrice(property.price)}${property.listing_type === 'rent' ? '/mo' : ''}</div>
-                    <span class="property-status ${property.status}">${capitalize(property.status)}</span>
-                </div>
+        container.innerHTML = `
+            <div class="property-actions-bar">
+                <button class="btn btn-primary" onclick="showAddPropertyModal()">+ Add Property</button>
             </div>
-        `).join('');
+            <div class="property-grid">
+                ${propertiesData.map(property => `
+                    <div class="property-card">
+                        <div class="property-image">
+                            ${isValidImageUrl(property.image_url) ? `<img src="${property.image_url}" alt="${escapeHtml(property.title)}">` : '🏠'}
+                        </div>
+                        <div class="property-info">
+                            <h3 class="property-title">${escapeHtml(property.title)}</h3>
+                            <p class="property-address">${escapeHtml(property.address)}, ${escapeHtml(property.city)}</p>
+                            <div class="property-price">$${formatPrice(property.price)}${property.listing_type === 'rent' ? '/mo' : ''}</div>
+                            <span class="property-status ${property.status}">${capitalize(property.status)}</span>
+                            <div class="property-card-actions">
+                                <button class="btn btn-secondary btn-sm" onclick="editProperty(${property.id})">Edit</button>
+                            </div>
+                        </div>
+                    </div>
+                `).join('')}
+            </div>
+        `;
     } else {
         container.innerHTML = '<p class="text-center">Failed to load properties</p>';
+    }
+}
+
+/**
+ * Show add property modal
+ */
+function showAddPropertyModal() {
+    document.getElementById('propertyForm').reset();
+    document.getElementById('propertyId').value = '';
+    document.getElementById('propertyModalTitle').textContent = 'Add New Property';
+    document.getElementById('propertyError').classList.add('hidden');
+    openModal('propertyModal');
+}
+
+/**
+ * Edit property
+ */
+function editProperty(propertyId) {
+    const property = propertiesData.find(p => p.id === propertyId);
+    if (!property) return;
+    
+    document.getElementById('propertyId').value = property.id;
+    document.getElementById('propertyTitle').value = property.title;
+    document.getElementById('propertyDescription').value = property.description || '';
+    document.getElementById('propertyAddress').value = property.address;
+    document.getElementById('propertyCity').value = property.city;
+    document.getElementById('propertyState').value = property.state;
+    document.getElementById('propertyZip').value = property.zip_code;
+    document.getElementById('propertyPrice').value = property.price;
+    document.getElementById('propertyType').value = property.property_type;
+    document.getElementById('propertyListingType').value = property.listing_type;
+    document.getElementById('propertyBedrooms').value = property.bedrooms;
+    document.getElementById('propertyBathrooms').value = property.bathrooms;
+    document.getElementById('propertySqFt').value = property.square_feet;
+    document.getElementById('propertyStatus').value = property.status;
+    document.getElementById('propertyImageUrl').value = property.image_url || '';
+    
+    document.getElementById('propertyModalTitle').textContent = 'Edit Property';
+    document.getElementById('propertyError').classList.add('hidden');
+    openModal('propertyModal');
+}
+
+/**
+ * Save property (add or update)
+ */
+async function saveProperty(event) {
+    event.preventDefault();
+    
+    const id = document.getElementById('propertyId').value;
+    const errorDiv = document.getElementById('propertyError');
+    errorDiv.classList.add('hidden');
+    
+    const data = {
+        title: document.getElementById('propertyTitle').value,
+        description: document.getElementById('propertyDescription').value,
+        address: document.getElementById('propertyAddress').value,
+        city: document.getElementById('propertyCity').value,
+        state: document.getElementById('propertyState').value,
+        zipCode: document.getElementById('propertyZip').value,
+        price: parseFloat(document.getElementById('propertyPrice').value),
+        propertyType: document.getElementById('propertyType').value,
+        listingType: document.getElementById('propertyListingType').value,
+        bedrooms: parseInt(document.getElementById('propertyBedrooms').value) || 0,
+        bathrooms: parseFloat(document.getElementById('propertyBathrooms').value) || 0,
+        squareFeet: parseInt(document.getElementById('propertySqFt').value) || 0,
+        status: document.getElementById('propertyStatus').value,
+        imageUrl: document.getElementById('propertyImageUrl').value || null
+    };
+    
+    const response = id 
+        ? await API.put(`/properties/${id}`, data)
+        : await API.post('/properties', data);
+    
+    if (response.ok && response.data.success) {
+        closeModal('propertyModal');
+        loadProperties();
+        alert(id ? 'Property updated successfully' : 'Property created successfully');
+    } else {
+        errorDiv.textContent = response.data.error || 'Failed to save property';
+        errorDiv.classList.remove('hidden');
     }
 }
 
@@ -288,16 +453,17 @@ async function loadAppointments() {
         }
         
         container.innerHTML = appointmentsData.map(apt => `
-            <div class="appointment-card">
+            <div class="appointment-card ${apt.status}">
                 <div class="appointment-info">
-                    <h4>${apt.property_title}</h4>
-                    <p>👤 ${apt.customer_first_name} ${apt.customer_last_name}</p>
-                    <p>📧 ${apt.customer_email} | 📞 ${apt.customer_phone}</p>
+                    <h4>${escapeHtml(apt.property_title)}</h4>
+                    <p>👤 ${escapeHtml(apt.customer_first_name)} ${escapeHtml(apt.customer_last_name)}</p>
+                    <p>📧 ${escapeHtml(apt.customer_email)} | 📞 ${escapeHtml(apt.customer_phone)}</p>
                     <p>📅 ${formatDate(apt.appointment_date)} at ${formatTime(apt.appointment_time)}</p>
-                    ${apt.notes ? `<p>📝 ${apt.notes}</p>` : ''}
+                    ${apt.queue_position ? `<p>📋 Queue Position: #${apt.queue_position}</p>` : ''}
+                    ${apt.notes ? `<p>📝 ${escapeHtml(apt.notes)}</p>` : ''}
                 </div>
-                <div>
-                    <span class="appointment-status ${apt.status}">${capitalize(apt.status)}</span>
+                <div class="appointment-actions">
+                    <span class="appointment-status ${apt.status}">${getStatusDisplay(apt)}</span>
                     <br><br>
                     <button class="btn btn-primary btn-sm" onclick="editAppointment(${apt.id})">Update</button>
                 </div>
@@ -306,6 +472,25 @@ async function loadAppointments() {
     } else {
         container.innerHTML = '<p class="text-center">Failed to load appointments</p>';
     }
+}
+
+/**
+ * Get status display with icon
+ */
+function getStatusDisplay(appointment) {
+    const status = appointment.status;
+    let icon = '';
+    let label = capitalize(status);
+    
+    switch (status) {
+        case 'confirmed': icon = '✅'; break;
+        case 'pending': icon = '⏳'; break;
+        case 'queued': icon = '📋'; label = `Queued #${appointment.queue_position || '?'}`; break;
+        case 'completed': icon = '✓'; break;
+        case 'cancelled': icon = '❌'; break;
+    }
+    
+    return `${icon} ${label}`;
 }
 
 /**
@@ -337,6 +522,7 @@ function editAppointment(appointmentId) {
     document.getElementById('appointmentDate').value = apt.appointment_date.split('T')[0];
     document.getElementById('appointmentTime').value = apt.appointment_time;
     document.getElementById('appointmentNotes').value = apt.notes || '';
+    document.getElementById('appointmentError').classList.add('hidden');
     
     openModal('appointmentModal');
 }
@@ -366,11 +552,27 @@ async function updateAppointment(event) {
     if (response.ok && response.data.success) {
         closeModal('appointmentModal');
         loadAppointments();
-        alert('Appointment updated successfully');
+        loadDashboardData(); // Refresh dashboard stats
+        
+        let message = 'Appointment updated successfully';
+        if (response.data.promotedCustomer) {
+            message += '. Note: Next customer in queue has been promoted to this slot.';
+        }
+        alert(message);
     } else {
         errorDiv.textContent = response.data.error || 'Failed to update appointment';
         errorDiv.classList.remove('hidden');
     }
+}
+
+/**
+ * Escape HTML
+ */
+function escapeHtml(str) {
+    if (!str) return '';
+    const div = document.createElement('div');
+    div.textContent = str;
+    return div.innerHTML;
 }
 
 /**

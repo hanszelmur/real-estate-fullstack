@@ -555,6 +555,102 @@ body {
     text-align: center;
 }
 
+/* Property Grid Layout */
+.property-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 20px;
+}
+
+/* Property Actions Bar */
+.property-actions-bar {
+    margin-bottom: 20px;
+}
+
+/* Property Card Actions */
+.property-card-actions {
+    margin-top: 10px;
+}
+
+/* Modal Large */
+.modal-lg {
+    max-width: 700px;
+}
+
+/* Form Row */
+.form-row {
+    display: flex;
+    gap: 15px;
+}
+
+.form-row .form-group {
+    flex: 1;
+}
+
+/* Queued Status */
+.appointment-status.queued {
+    background: #e3f2fd;
+    color: #1565c0;
+}
+
+.appointment-item.queued {
+    border-left-color: #1565c0;
+}
+
+/* Appointment Card with Status Border */
+.appointment-card.pending {
+    border-left: 4px solid #f57c00;
+}
+
+.appointment-card.confirmed {
+    border-left: 4px solid #388e3c;
+}
+
+.appointment-card.queued {
+    border-left: 4px solid #1565c0;
+}
+
+.appointment-card.completed {
+    border-left: 4px solid #1976d2;
+}
+
+.appointment-card.cancelled {
+    border-left: 4px solid #d32f2f;
+    opacity: 0.7;
+}
+
+/* Appointment Actions */
+.appointment-actions {
+    text-align: right;
+}
+
+/* Agent Rating Display */
+.agent-rating-display {
+    margin-top: 15px;
+    font-size: 1.1rem;
+}
+
+.rating-stars {
+    color: #f39c12;
+}
+
+.rating-value {
+    font-weight: bold;
+    color: #2c3e50;
+    margin-left: 5px;
+}
+
+.rating-count {
+    color: #666;
+    font-size: 0.9rem;
+    margin-left: 5px;
+}
+
+.no-ratings {
+    color: #999;
+    font-style: italic;
+}
+
 /* Responsive */
 @media (max-width: 768px) {
     .navbar {

@@ -40,6 +40,7 @@
                 <button class="tab active" onclick="filterAppointments('all')">All</button>
                 <button class="tab" onclick="filterAppointments('pending')">Pending</button>
                 <button class="tab" onclick="filterAppointments('confirmed')">Confirmed</button>
+                <button class="tab" onclick="filterAppointments('queued')">Queued</button>
                 <button class="tab" onclick="filterAppointments('completed')">Completed</button>
                 <button class="tab" onclick="filterAppointments('cancelled')">Cancelled</button>
             </div>
@@ -49,6 +50,37 @@
             </div>
         </div>
     </section>
+
+    <!-- Rating Modal -->
+    <div class="modal" id="ratingModal">
+        <div class="modal-content">
+            <span class="close" onclick="closeModal('ratingModal')">&times;</span>
+            <h2>Rate Your Experience</h2>
+            <p>Property: <strong id="ratingPropertyTitle"></strong></p>
+            <p>Agent: <strong id="ratingAgentName"></strong></p>
+            <form id="ratingForm" onsubmit="submitRating(event)">
+                <input type="hidden" id="ratingAppointmentId">
+                <input type="hidden" id="ratingValue" value="0">
+                <div class="form-group">
+                    <label>How would you rate your experience?</label>
+                    <div class="star-rating">
+                        <button type="button" class="star-btn" onclick="selectRating(1)">★</button>
+                        <button type="button" class="star-btn" onclick="selectRating(2)">★</button>
+                        <button type="button" class="star-btn" onclick="selectRating(3)">★</button>
+                        <button type="button" class="star-btn" onclick="selectRating(4)">★</button>
+                        <button type="button" class="star-btn" onclick="selectRating(5)">★</button>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label for="ratingFeedback">Feedback (optional)</label>
+                    <textarea id="ratingFeedback" rows="3" placeholder="Share your experience with the agent..."></textarea>
+                </div>
+                <div class="error-message hidden" id="ratingError"></div>
+                <div class="success-message hidden" id="ratingSuccess"></div>
+                <button type="submit" class="btn btn-primary btn-full">Submit Rating</button>
+            </form>
+        </div>
+    </div>
 
     <!-- Footer -->
     <footer class="footer">

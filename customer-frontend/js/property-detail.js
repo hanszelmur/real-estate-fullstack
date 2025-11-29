@@ -1,7 +1,8 @@
 /**
  * Property Detail Page JavaScript
  * 
- * Handles single property view and appointment booking.
+ * Handles single property view, appointment booking with queue awareness,
+ * and agent ratings display.
  */
 
 let currentProperty = null;
@@ -42,9 +43,59 @@ async function loadPropertyDetail() {
         currentProperty = response.data.property;
         renderPropertyDetail(currentProperty);
         document.title = `${currentProperty.title} - Real Estate`;
+        
+        // Load agent ratings if agent is assigned
+        if (currentProperty.assigned_agent_id) {
+            loadAgentRatings(currentProperty.assigned_agent_id);
+        }
     } else {
         container.innerHTML = '<p class="text-center">Property not found or no longer available.</p>';
     }
+}
+
+/**
+ * Load agent ratings summary
+ */
+async function loadAgentRatings(agentId) {
+    const response = await API.get(`/ratings/agent/${agentId}/summary`);
+    
+    if (response.ok && response.data.success) {
+        const summary = response.data.summary;
+        const agent = response.data.agent;
+        
+        if (summary.totalRatings > 0) {
+            const ratingHtml = `
+                <div class="agent-rating">
+                    <div class="rating-stars">
+                        ${renderStars(parseFloat(summary.averageRating))}
+                        <span class="rating-value">${summary.averageRating}</span>
+                    </div>
+                    <span class="rating-count">(${summary.totalRatings} ${summary.totalRatings === 1 ? 'review' : 'reviews'})</span>
+                </div>
+            `;
+            
+            const agentInfoDiv = document.querySelector('.agent-info');
+            if (agentInfoDiv) {
+                agentInfoDiv.insertAdjacentHTML('beforeend', ratingHtml);
+            }
+        }
+    }
+}
+
+/**
+ * Render star rating
+ */
+function renderStars(rating) {
+    const fullStars = Math.floor(rating);
+    const hasHalfStar = rating - fullStars >= 0.5;
+    const emptyStars = 5 - fullStars - (hasHalfStar ? 1 : 0);
+    
+    let stars = '';
+    for (let i = 0; i < fullStars; i++) stars += '★';
+    if (hasHalfStar) stars += '½';
+    for (let i = 0; i < emptyStars; i++) stars += '☆';
+    
+    return `<span class="stars">${stars}</span>`;
 }
 
 /**
@@ -190,12 +241,17 @@ function scheduleViewing() {
     
     const errorDiv = document.getElementById('bookingError');
     const successDiv = document.getElementById('bookingSuccess');
+    const warningDiv = document.getElementById('bookingWarning');
     if (errorDiv) errorDiv.classList.add('hidden');
     if (successDiv) successDiv.classList.add('hidden');
+    if (warningDiv) warningDiv.classList.remove('hidden');
     
     setupDatePicker();
     openModal('bookingModal');
 }
+
+// UI Constants
+const BOOKING_SUCCESS_DISPLAY_MS = 3000;
 
 /**
  * Handle booking form submission
@@ -221,7 +277,20 @@ async function handleBooking(event) {
     });
     
     if (response.ok && response.data.success) {
-        successDiv.textContent = 'Your viewing request has been submitted! We will confirm shortly.';
+        let message = response.data.message;
+        
+        if (response.data.isQueued) {
+            successDiv.innerHTML = `
+                <strong>⏳ Added to Queue</strong><br>
+                ${message}<br>
+                <small>Queue Position: #${response.data.queuePosition}</small>
+            `;
+        } else {
+            successDiv.innerHTML = `
+                <strong>✓ Request Submitted</strong><br>
+                ${message}
+            `;
+        }
         successDiv.classList.remove('hidden');
         
         // Clear form
@@ -230,7 +299,7 @@ async function handleBooking(event) {
         // Close modal after a delay
         setTimeout(() => {
             closeModal('bookingModal');
-        }, 2000);
+        }, BOOKING_SUCCESS_DISPLAY_MS);
     } else {
         errorDiv.textContent = response.data.error || 'Failed to submit request. Please try again.';
         errorDiv.classList.remove('hidden');

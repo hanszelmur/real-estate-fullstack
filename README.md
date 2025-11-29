@@ -2,6 +2,38 @@
 
 A complete fullstack starter codebase for a real-estate application using Node.js (Express) with direct MySQL access for the backend, and separate frontend portals for customer, agent, and admin users.
 
+## ✨ Features Checklist
+
+### Booking System
+- [x] **Full datetime precision** - Booking timestamps include seconds for precise ordering
+- [x] **Double-booking prevention** - Backend checks and prevents overlapping bookings
+- [x] **Queuing system** - If a slot is taken, customers are added to a queue with position tracking
+- [x] **Instant queue promotion** - When a booking is cancelled, next customer in queue is automatically promoted
+- [x] **High-demand warnings** - Frontend displays warning about queue possibility during booking
+- [x] **Blocked slots** - Ability to block specific time slots for properties
+- [x] **Real-time status updates** - Customer dashboards show confirmed, queued, promoted, or cancelled status
+
+### Agent Ratings
+- [x] **Post-viewing ratings** - Customers can rate agents after completed viewings
+- [x] **One rating per appointment** - Prevents duplicate ratings
+- [x] **Self-rating prevention** - Agents cannot rate themselves
+- [x] **Rating display** - Agent ratings visible on property pages
+- [x] **Rating summary** - Average rating and total reviews shown
+- [x] **Feedback collection** - Optional text feedback with ratings
+
+### Property Management
+- [x] **Full CRUD operations** - Agents can add and edit their assigned properties
+- [x] **Admin property control** - Admin can manage all properties
+- [x] **Agent assignment** - Properties assigned to specific agents
+- [x] **Featured properties** - Admin can mark properties as featured
+- [x] **Status management** - Available, pending, sold, rented statuses
+
+### User Management
+- [x] **Role-based access** - Customer, Agent, Admin roles
+- [x] **Phone verification** - SMS verification for customer registration
+- [x] **Profile management** - Users can view and manage their profiles
+- [x] **Account activation** - Admin can activate/deactivate accounts
+
 ## 🏗️ Project Structure
 
 ```
@@ -14,12 +46,13 @@ real-estate-fullstack/
 │   ├── routes/
 │   │   ├── auth.js            # Authentication routes (register, login, verify)
 │   │   ├── properties.js      # Property CRUD operations
-│   │   ├── appointments.js    # Appointment booking system
+│   │   ├── appointments.js    # Appointment booking with queue system
+│   │   ├── ratings.js         # Agent rating system
 │   │   ├── users.js           # User management (admin only)
 │   │   ├── notifications.js   # User notifications
 │   │   └── waitlist.js        # Property waitlist
 │   ├── sql/
-│   │   ├── schema.sql         # Database schema creation script
+│   │   ├── schema.sql         # Database schema (all tables)
 │   │   └── seed.sql           # Sample data including admin/agent users
 │   ├── utils/
 │   │   ├── auth.js            # Password hashing, token generation
@@ -36,20 +69,20 @@ real-estate-fullstack/
 │   │   ├── auth.js            # Authentication handling
 │   │   ├── app.js             # Main application logic
 │   │   ├── properties.js      # Property listing page
-│   │   ├── property-detail.js # Single property view
-│   │   └── appointments.js    # Customer appointments
+│   │   ├── property-detail.js # Single property view with ratings
+│   │   └── appointments.js    # Customer appointments with rating UI
 │   ├── index.html             # Home page
 │   ├── properties.html        # Property listings
-│   ├── property.html          # Property details
-│   └── appointments.html      # Customer appointments
+│   ├── property.html          # Property details with agent rating
+│   └── appointments.html      # Customer appointments with rating modal
 │
 ├── agent-frontend/             # Internal agent portal
 │   ├── css/styles.css
 │   ├── js/
 │   │   ├── config.js
 │   │   ├── api.js
-│   │   └── app.js
-│   └── index.html             # Agent dashboard
+│   │   └── app.js             # Agent dashboard with property management
+│   └── index.html             # Agent dashboard with ratings display
 │
 ├── admin-frontend/             # Company admin portal
 │   ├── css/styles.css
@@ -153,10 +186,60 @@ serve agent-frontend -l 3002
 serve admin-frontend -l 3003
 ```
 
-**Using VSCode Live Server:**
-- Open the HTML file in VSCode
-- Right-click and select "Open with Live Server"
-- Configure port in settings
+## 💾 Database Schema
+
+### Tables Overview
+
+| Table | Description |
+|-------|-------------|
+| `users` | User accounts (customers, agents, admins) |
+| `properties` | Property listings with details |
+| `appointments` | Booking records with queue support |
+| `agent_ratings` | Customer ratings for agents |
+| `agent_assignments` | Agent-property assignments |
+| `blocked_slots` | Blocked time slots for properties |
+| `notifications` | User notification messages |
+| `verifications` | Phone verification codes |
+| `waitlist` | Property interest waitlist |
+
+### Key Tables Structure
+
+#### appointments
+```sql
+- id (PK)
+- property_id (FK -> properties)
+- customer_id (FK -> users)
+- agent_id (FK -> users)
+- appointment_date
+- appointment_time
+- booking_timestamp (DATETIME(6) - microsecond precision)
+- status (pending/confirmed/completed/cancelled/queued)
+- queue_position (INT, NULL if confirmed)
+- notes
+- created_at, updated_at
+```
+
+#### agent_ratings
+```sql
+- id (PK)
+- agent_id (FK -> users)
+- customer_id (FK -> users)
+- appointment_id (FK -> appointments, UNIQUE)
+- rating (1-5)
+- feedback (TEXT)
+- created_at
+```
+
+#### blocked_slots
+```sql
+- id (PK)
+- property_id (FK -> properties)
+- blocked_date
+- blocked_time
+- reason
+- blocked_by (FK -> users)
+- created_at
+```
 
 ## 👥 User Roles
 
@@ -165,9 +248,10 @@ serve admin-frontend -l 3003
 - **Registration:** Public registration with phone verification required
 - **Features:**
   - Browse available properties
-  - View property details
-  - Schedule viewing appointments
+  - View property details with agent ratings
+  - Schedule viewing appointments (with queue awareness)
   - Manage their appointments
+  - Rate agents after completed viewings
   - Join property waitlists
 
 ### Agent (Internal)
@@ -177,8 +261,10 @@ serve admin-frontend -l 3003
   - `agent1@realestate.com` / `agent123`
   - `agent2@realestate.com` / `agent123`
 - **Features:**
-  - View assigned properties
+  - View and edit assigned properties
+  - Add new properties (auto-assigned)
   - Manage appointments (confirm, complete, cancel)
+  - View their ratings and feedback
   - View notifications
 
 ### Admin (Company)
@@ -193,52 +279,65 @@ serve admin-frontend -l 3003
   - Agent assignment
   - Dashboard statistics
 
-## 📱 SMS Verification Workflow
+## 📅 Booking Logic & Business Rules
 
-The application uses a console-based SMS verification system for demo/development:
+### Double-Booking Prevention
 
-### How It Works
+When a customer books a viewing:
+1. System records `booking_timestamp` with microsecond precision
+2. System checks if slot (property + date + time) is already taken
+3. If slot is blocked → Booking rejected with error message
+4. If slot is already booked → Customer is added to **queue**
+5. Queue position is calculated based on booking timestamp order
 
-1. **Customer Registration:**
-   - Customer submits registration form with phone number
-   - Backend generates a 6-digit verification code
-   - Code is stored in `verifications` table with 10-minute expiry
-   - Code is logged to the backend console
+### Queue System
 
-2. **Console Output:**
-   ```
-   ========================================
-   📱 SMS VERIFICATION CODE
-   ========================================
-   Phone: +1-555-123-4567
-   Code: 847293
-   Expires: 2024-01-15T10:35:00.000Z
-   ========================================
-   ⚠️  Operator: Please manually send this code via SMS
-   ========================================
-   ```
+- **Status: `queued`** - Customer is waiting for slot to become available
+- **Queue Position** - Shows customer their position in line (e.g., "#1", "#2")
+- **Instant Promotion** - When a booking is cancelled:
+  - Next customer in queue is automatically promoted to `confirmed`
+  - All other queue positions are decremented
+  - Promoted customer receives instant notification
 
-3. **Manual SMS Send:**
-   - Operator sees the code in console
-   - Operator manually sends SMS to customer (for demo purposes)
-   - In production, integrate with SMS service (Twilio, etc.)
+### Customer-Facing Warning
 
-4. **Verification:**
-   - Customer enters code in verification modal
-   - If valid and not expired, account is verified
-   - Customer can now log in
+Before booking, customers see:
+> ⚠️ **High-Demand Notice:** In high-demand periods, multiple customers may try to book the same time slot simultaneously. If your preferred slot is already taken, you'll be added to a queue and notified immediately if it becomes available. Please check your confirmation status after booking.
 
-5. **Resend Code:**
-   - If code expires, customer can request new code
-   - Previous codes are invalidated
-   - New code logged to console
+### Status Flow
 
-### API Endpoints
+```
+[New Booking]
+    │
+    ├─── Slot Available ───> pending ───> confirmed ───> completed
+    │                                         │
+    └─── Slot Taken ───────> queued ──────────┘ (via promotion)
+                               │
+                               └─── cancelled
+```
 
-- `POST /api/auth/register` - Create account (triggers verification code)
-- `POST /api/auth/verify` - Verify phone with code
-- `POST /api/auth/resend-code` - Request new verification code
-- `POST /api/auth/login` - Login (auto-sends code if unverified customer)
+## ⭐ Agent Rating System
+
+### Rating Rules
+
+1. **Only customers can rate** - Agents and admins cannot rate
+2. **Only after completion** - Rating available only for `completed` appointments
+3. **One rating per appointment** - No duplicate ratings allowed
+4. **No self-rating** - Customers can only rate other users
+
+### Rating Flow
+
+1. Customer completes a viewing appointment
+2. Appointment page shows "Rate Agent" button
+3. Customer selects 1-5 stars and optional feedback
+4. Agent receives notification of new rating
+5. Rating appears on agent's profile and property pages
+
+### Rating Display
+
+- **Property Page:** Shows agent's average rating and review count
+- **Agent Dashboard:** Shows their overall rating summary
+- **Reviews:** Anonymized customer names (e.g., "J***") for privacy
 
 ## 🔌 API Endpoints
 
@@ -265,10 +364,19 @@ The application uses a console-based SMS verification system for demo/developmen
 | Method | Endpoint | Description | Access |
 |--------|----------|-------------|--------|
 | GET | /api/appointments | List appointments | Authenticated |
+| GET | /api/appointments/available-slots/:propertyId | Get available slots | Public |
 | GET | /api/appointments/:id | Get appointment details | Authenticated |
-| POST | /api/appointments | Book appointment | Customer |
+| POST | /api/appointments | Book appointment (with queue) | Customer |
 | PUT | /api/appointments/:id | Update appointment | Authenticated |
 | DELETE | /api/appointments/:id | Delete appointment | Admin |
+
+### Ratings
+| Method | Endpoint | Description | Access |
+|--------|----------|-------------|--------|
+| POST | /api/ratings | Submit agent rating | Customer |
+| GET | /api/ratings/agent/:agentId | Get agent's ratings | Public |
+| GET | /api/ratings/agent/:agentId/summary | Get rating summary | Public |
+| GET | /api/ratings/can-rate/:appointmentId | Check if can rate | Customer |
 
 ### Users (Admin Only)
 | Method | Endpoint | Description | Access |
@@ -291,6 +399,36 @@ The application uses a console-based SMS verification system for demo/developmen
 | GET | /api/waitlist | List waitlist entries | Authenticated |
 | POST | /api/waitlist | Join waitlist | Customer |
 | DELETE | /api/waitlist/:id | Leave waitlist | Authenticated |
+
+## 📱 SMS Verification Workflow
+
+The application uses a console-based SMS verification system for demo/development:
+
+### How It Works
+
+1. **Customer Registration:**
+   - Customer submits registration form with phone number
+   - Backend generates a 6-digit verification code
+   - Code is stored in `verifications` table with 10-minute expiry
+   - Code is logged to the backend console
+
+2. **Console Output:**
+   ```
+   ========================================
+   📱 SMS VERIFICATION CODE
+   ========================================
+   Phone: +1-555-123-4567
+   Code: 847293
+   Expires: 2024-01-15T10:35:00.000Z
+   ========================================
+   ⚠️  Operator: Please manually send this code via SMS
+   ========================================
+   ```
+
+3. **Verification:**
+   - Customer enters code in verification modal
+   - If valid and not expired, account is verified
+   - Customer can now log in
 
 ## 💾 Database Export/Import
 
@@ -346,6 +484,7 @@ mysql -u root -p real_estate_db < backend/sql/seed.sql
 - Token-based authentication
 - Role-based access control
 - SQL injection prevented via parameterized queries
+- XSS prevention via HTML escaping
 
 ## 🎯 Demo Scenarios
 
@@ -355,21 +494,37 @@ mysql -u root -p real_estate_db < backend/sql/seed.sql
 3. Watch backend console for verification code
 4. Enter code in verification modal
 5. Browse properties and schedule a viewing
-6. Check "My Appointments" page
+6. Note the high-demand warning message
+7. Check "My Appointments" page for status
 
-### Scenario 2: Agent Workflow
+### Scenario 2: Queue System Demo
+1. Book a viewing as Customer A
+2. Register as Customer B and book same slot
+3. Customer B sees "Queued #1" status
+4. Customer A cancels their booking
+5. Customer B is automatically promoted to "Confirmed"
+
+### Scenario 3: Agent Rating Flow
+1. As agent, confirm and complete a booking
+2. As customer, view completed appointment
+3. Click "Rate Agent" button
+4. Submit star rating and feedback
+5. View rating on property page
+
+### Scenario 4: Agent Property Management
 1. Open agent frontend (http://localhost:3002)
 2. Login with `agent1@realestate.com` / `agent123`
-3. View dashboard with assigned properties and appointments
-4. Confirm or complete pending appointments
+3. Navigate to "My Properties"
+4. Click "Add Property" to create new listing
+5. Edit existing property details
 
-### Scenario 3: Admin Management
+### Scenario 5: Admin Management
 1. Open admin frontend (http://localhost:3003)
 2. Login with `admin@realestate.com` / `admin123`
 3. View dashboard statistics
 4. Manage users (create new agent, deactivate customer)
 5. Add/edit properties and assign to agents
-6. Monitor all appointments
+6. Monitor all appointments including queued ones
 
 ## 📝 License
 
