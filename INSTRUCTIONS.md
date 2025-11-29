@@ -359,10 +359,41 @@ npm start             # Serve on port 3003
 
 See the main README.md for the full roadmap. Key upcoming features:
 
+### 🔴 CRITICAL: Property Status Workflow (Mark as Sold)
+
+**Current Gap:** The database supports property statuses (`available`, `pending`, `sold`, `rented`) but there is **NO UI workflow** for agents or admins to mark properties as sold or rented. This is a fundamental feature missing from any production real estate platform.
+
+**What Needs to Be Built:**
+
+1. **Agent Portal Changes:**
+   - Add "Mark as Sold" / "Mark as Rented" buttons on property cards
+   - Confirmation modal with optional sale details (price, date, notes)
+   - Status dropdown in property edit form
+   
+2. **Admin Portal Changes:**
+   - Status management for any property
+   - Sold properties archive/reporting view
+   - Sales metrics on dashboard
+   
+3. **Customer Portal Changes:**
+   - "SOLD" badge overlay on sold property images
+   - "Recently Sold" filter option (for market research)
+   - Disable booking buttons on sold properties
+   - "This property has been sold" message on detail page
+
+4. **Backend Changes:**
+   - Add `PUT /api/properties/:id/status` endpoint
+   - Auto-cancel appointments when property sold
+   - Send notifications to affected customers
+   - Create status history tracking table
+
+**See README.md § "Critical Feature Gap: Property Lifecycle & Transaction Workflow" for detailed specifications.**
+
 ### Admin Analytics Dashboard
 - Charts for bookings over time
 - Agent performance metrics
 - Property trend analysis
+- Sales reporting (pending implementation of Mark as Sold)
 
 ### ~~Document Upload System~~ ✅ Implemented
 - ~~Property photos and floor plans~~
@@ -373,6 +404,83 @@ See the main README.md for the full roadmap. Key upcoming features:
 - Customers can save properties for later
 - View and manage favorites list
 - Search within favorites
+
+---
+
+## 🚨 Known Workflow Gaps
+
+This section documents specific workflows that are incomplete or missing from the current implementation.
+
+### Property Lifecycle Workflow
+
+```
+Current State (Incomplete):
+┌────────────┐                   ┌────────────┐
+│ AVAILABLE  │  ───(manual)───>  │   SOLD     │  ← No UI exists!
+│            │      DB update    │            │
+└────────────┘                   └────────────┘
+
+Required State (Complete):
+┌────────────┐     ┌────────────┐     ┌────────────┐
+│ AVAILABLE  │────>│  PENDING   │────>│   SOLD     │
+│            │     │            │     │            │
+└────────────┘     └────────────┘     └────────────┘
+       ↑                 │                  │
+       └─────────────────┴──────────────────┘
+              (Can revert if deal falls through)
+
+Actions on Status Change to SOLD:
+1. ✗ Cancel all pending appointments (NOT IMPLEMENTED)
+2. ✗ Cancel all queued appointments (NOT IMPLEMENTED)
+3. ✗ Notify waitlisted customers (NOT IMPLEMENTED)
+4. ✗ Record sale price and date (NOT IMPLEMENTED)
+5. ✗ Update agent's sales metrics (NOT IMPLEMENTED)
+6. ✗ Show "SOLD" badge to customers (NOT IMPLEMENTED)
+```
+
+### Missing "Mark as Sold" User Flow (Agent)
+
+**Expected Flow (NOT YET BUILT):**
+
+```
+1. Agent navigates to My Properties
+2. Agent clicks property card or "..." menu
+3. Agent selects "Mark as Sold" option
+4. System shows confirmation dialog:
+   ┌─────────────────────────────────────────────────┐
+   │ Confirm Property Sale                          │
+   ├─────────────────────────────────────────────────┤
+   │ Property: 123 Main Street                      │
+   │ Listed: $450,000                               │
+   │                                                │
+   │ Final Sale Price: [________]                   │
+   │ Closing Date: [________]                       │
+   │                                                │
+   │ ⚠ This will:                                   │
+   │ • Cancel 3 pending appointments               │
+   │ • Notify 2 waitlisted customers               │
+   │ • Remove from active listings                 │
+   │                                                │
+   │ [Cancel]              [Confirm Sale]          │
+   └─────────────────────────────────────────────────┘
+5. Agent confirms sale
+6. System updates property status
+7. System auto-cancels appointments
+8. System sends notifications
+9. Agent sees success message
+10. Property shows "SOLD" status
+```
+
+### Appointment Auto-Cancellation Gap
+
+**Current Behavior:** When an admin manually changes property status to "sold" in the database, existing appointments remain in their original state (pending/confirmed/queued).
+
+**Required Behavior:** When property status changes to "sold" or "rented":
+- All `pending` appointments → `cancelled` with reason "Property no longer available"
+- All `confirmed` appointments → `cancelled` with reason "Property no longer available"  
+- All `queued` appointments → `cancelled` with reason "Property no longer available"
+- Notification sent to each affected customer
+- Waitlist entries removed with notification
 
 ---
 
@@ -588,25 +696,43 @@ A: When a booking is cancelled, the system automatically promotes the first queu
 **Q: Why can't I delete properties as an agent?**  
 A: By design - only admins can delete properties to prevent accidental data loss. Agents can edit properties but not delete them.
 
+**Q: How do I mark a property as sold?**  
+A: ⚠️ **This feature is NOT yet implemented in the UI.** Currently, you must manually update the database: `UPDATE properties SET status = 'sold' WHERE id = ?`. See the "Known Workflow Gaps" section above for details on this missing feature.
+
+**Q: What happens to appointments when a property is sold?**  
+A: ⚠️ **Currently, nothing happens automatically.** Appointments remain in their original state. This is a known gap - see "Appointment Auto-Cancellation Gap" section. In production, appointments should be auto-cancelled with customer notifications.
+
+**Q: Can customers see sold properties?**  
+A: Currently, sold properties are hidden from customers. A "Recently Sold" view should be implemented for market research purposes.
+
+**Q: How do I track sales metrics and agent performance?**  
+A: ⚠️ **Not yet implemented.** The admin dashboard does not include sales analytics. This requires implementing the "Mark as Sold" workflow first, which will enable sale price and date tracking.
+
 ---
 
 ## 📝 UX Findings Summary
 
 ### Key Issues Identified
 
-1. **No password recovery** - Users locked out have no self-service option
-2. **Console-based SMS** - Confusing for new users expecting real SMS
-3. **Limited mobile support** - UI not optimized for mobile devices
-4. **No loading indicators** - Some forms submit without visual feedback
-5. **Inconsistent modals** - Close behavior varies between modals
-6. **No empty states** - Lists show generic messages when empty
+1. **No "Mark as Sold" workflow** - Critical missing feature for property lifecycle management
+2. **No password recovery** - Users locked out have no self-service option
+3. **Console-based SMS** - Confusing for new users expecting real SMS
+4. **Limited mobile support** - UI not optimized for mobile devices
+5. **No loading indicators** - Some forms submit without visual feedback
+6. **Inconsistent modals** - Close behavior varies between modals
+7. **No empty states** - Lists show generic messages when empty
+8. **No appointment auto-cancellation** - Sold properties keep their appointments
+9. **No sales reporting** - Cannot track agent performance by sales
 
 ### Recommended Priorities
 
-1. Add forgot password functionality
-2. Implement real email/SMS verification
-3. Make UI mobile-responsive
-4. Add consistent loading states
-5. Improve error messages with guidance
+1. **Implement "Mark as Sold/Rented" workflow** (Critical for production use)
+2. **Add auto-cancellation when property sold** (Essential business logic)
+3. Add forgot password functionality
+4. Implement real email/SMS verification
+5. Make UI mobile-responsive
+6. Add consistent loading states
+7. Improve error messages with guidance
+8. Add sold properties archive with reporting
 
-See README.md for detailed UX critique by role.
+See README.md for detailed UX critique by role and comprehensive feature gap analysis.
