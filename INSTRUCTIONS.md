@@ -69,12 +69,19 @@ Each route file handles a specific domain of the API:
 | File | Endpoints | Purpose |
 |------|-----------|---------|
 | `auth.js` | `/api/auth/*` | Registration, login, SMS verification |
-| `properties.js` | `/api/properties/*` | CRUD for property listings |
+| `properties.js` | `/api/properties/*` | CRUD for property listings and photo uploads |
 | `appointments.js` | `/api/appointments/*` | Booking with queue management |
 | `ratings.js` | `/api/ratings/*` | Agent rating system |
 | `users.js` | `/api/users/*` | Admin user management |
 | `notifications.js` | `/api/notifications/*` | In-app notification system |
 | `waitlist.js` | `/api/waitlist/*` | Property interest waitlist |
+
+**Key: `properties.js`** handles property management and image uploads:
+- CRUD operations for property listings
+- Image upload via multipart/form-data (using multer)
+- Multiple images per property with primary image support
+- Images stored in `backend/uploads/images/`
+- Images served as static files via `/uploads/images/filename.jpg`
 
 **Key: `appointments.js`** handles the complex booking queue logic:
 - When a slot is already booked, new bookings go to a queue
@@ -357,15 +364,87 @@ See the main README.md for the full roadmap. Key upcoming features:
 - Agent performance metrics
 - Property trend analysis
 
-### Document Upload System
-- Property photos and floor plans
-- Agent can upload multiple images per property
-- Customers see photo gallery on listings
+### ~~Document Upload System~~ ✅ Implemented
+- ~~Property photos and floor plans~~
+- ~~Agent can upload multiple images per property~~
+- ~~Customers see photo gallery on listings~~
 
 ### Saved/Favorited Properties
 - Customers can save properties for later
 - View and manage favorites list
 - Search within favorites
+
+---
+
+## 📷 Property Image Upload
+
+### Overview
+
+The application supports uploading multiple images per property. Images are stored on the server and served as static files.
+
+### How It Works
+
+1. **Uploading Images (Agent/Admin)**:
+   - In the property form (Add/Edit), use the "Upload Images" file input
+   - Select one or more images (max 5MB each, max 10 files)
+   - Images are previewed before saving
+   - On form submission, images are uploaded via multipart/form-data
+
+2. **Managing Existing Photos**:
+   - When editing a property, existing photos are displayed
+   - Click the star (★) icon to set a photo as primary
+   - Click the trash (🗑) icon to delete a photo
+
+3. **Viewing Images (All Roles)**:
+   - Property detail page displays an image gallery
+   - Gallery supports navigation with prev/next buttons and thumbnails
+   - Property cards show the primary image
+
+### Storage Location
+
+- Images are stored in: `backend/uploads/images/`
+- Images are served at: `http://localhost:3000/uploads/images/filename.jpg`
+- Filenames are generated uniquely: `property-{timestamp}-{random}.{ext}`
+
+### API Endpoints
+
+```javascript
+// Get all photos for a property
+GET /api/properties/:id/photos
+
+// Upload photos (multipart/form-data with 'images' field)
+POST /api/properties/:id/photos
+
+// Set a photo as primary
+PUT /api/properties/:propertyId/photos/:photoId/primary
+
+// Delete a photo
+DELETE /api/properties/:propertyId/photos/:photoId
+```
+
+### Database Schema
+
+```sql
+CREATE TABLE property_photos (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    property_id INT NOT NULL,
+    filename VARCHAR(255) NOT NULL,
+    original_filename VARCHAR(255),
+    is_primary BOOLEAN DEFAULT FALSE,
+    display_order INT DEFAULT 0,
+    uploaded_by INT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (property_id) REFERENCES properties(id) ON DELETE CASCADE
+);
+```
+
+### Upgrading Existing Installations
+
+If upgrading from a previous version without image upload support:
+
+1. Run the updated schema.sql to create the `property_photos` table
+2. Ensure the `backend/uploads/images/` directory exists
+3. Existing properties with `image_url` will continue to work (backward compatible)
 
 ---
 

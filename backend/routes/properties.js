@@ -32,9 +32,59 @@
 
 const express = require('express');
 const router = express.Router();
+const path = require('path');
+const fs = require('fs');
+const multer = require('multer');
 const db = require('../config/database');
 const { authenticate, requireRole, optionalAuth } = require('../middleware/auth');
 const auditLogger = require('../utils/auditLogger');
+
+// ============================================================================
+// FILE UPLOAD CONFIGURATION
+// ============================================================================
+// Configure multer for property image uploads
+// Images are stored in backend/uploads/images/
+// ============================================================================
+
+const uploadsDir = path.join(__dirname, '..', 'uploads', 'images');
+
+// Ensure uploads directory exists
+if (!fs.existsSync(uploadsDir)) {
+    fs.mkdirSync(uploadsDir, { recursive: true });
+}
+
+// Configure storage
+const storage = multer.diskStorage({
+    destination: function (req, file, cb) {
+        cb(null, uploadsDir);
+    },
+    filename: function (req, file, cb) {
+        // Generate unique filename: property-{timestamp}-{random}.{ext}
+        const ext = path.extname(file.originalname).toLowerCase();
+        const uniqueName = `property-${Date.now()}-${Math.random().toString(36).substring(2, 8)}${ext}`;
+        cb(null, uniqueName);
+    }
+});
+
+// File filter - only allow images
+const fileFilter = (req, file, cb) => {
+    const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp'];
+    if (allowedTypes.includes(file.mimetype)) {
+        cb(null, true);
+    } else {
+        cb(new Error('Only image files are allowed (jpeg, jpg, png, gif, webp)'), false);
+    }
+};
+
+// Multer configuration
+const upload = multer({
+    storage: storage,
+    fileFilter: fileFilter,
+    limits: {
+        fileSize: 5 * 1024 * 1024, // 5MB max file size
+        files: 10 // Max 10 files per upload
+    }
+});
 
 /**
  * GET /api/properties
@@ -228,6 +278,17 @@ router.get('/:id', optionalAuth, async (req, res) => {
                 error: 'Property not found.'
             });
         }
+        
+        // Fetch property photos
+        const photos = await db.query(`
+            SELECT id, filename, original_filename, is_primary, display_order
+            FROM property_photos
+            WHERE property_id = ?
+            ORDER BY is_primary DESC, display_order ASC, created_at ASC
+        `, [id]);
+        
+        // Add photos array to property object
+        property.photos = photos;
         
         res.json({
             success: true,
@@ -550,6 +611,316 @@ router.delete('/:id', authenticate, requireRole('admin'), async (req, res) => {
             error: 'Failed to delete property.'
         });
     }
+});
+
+// ============================================================================
+// PROPERTY PHOTO ENDPOINTS
+// ============================================================================
+
+/**
+ * GET /api/properties/:id/photos
+ * Get all photos for a property
+ * Public endpoint
+ */
+router.get('/:id/photos', async (req, res) => {
+    try {
+        const { id } = req.params;
+        
+        const photos = await db.query(`
+            SELECT id, filename, original_filename, is_primary, display_order, created_at
+            FROM property_photos
+            WHERE property_id = ?
+            ORDER BY is_primary DESC, display_order ASC, created_at ASC
+        `, [id]);
+        
+        res.json({
+            success: true,
+            photos
+        });
+        
+    } catch (error) {
+        console.error('Get property photos error:', error);
+        res.status(500).json({
+            success: false,
+            error: 'Failed to fetch property photos.'
+        });
+    }
+});
+
+/**
+ * POST /api/properties/:id/photos
+ * Upload photos for a property
+ * Admin/Agent only (must be assigned agent for agents)
+ * 
+ * Accepts multipart/form-data with 'images' field containing one or more files
+ */
+router.post('/:id/photos', authenticate, requireRole('admin', 'agent'), upload.array('images', 10), async (req, res) => {
+    try {
+        const { id } = req.params;
+        
+        // Check if property exists
+        const properties = await db.query('SELECT * FROM properties WHERE id = ?', [id]);
+        
+        if (properties.length === 0) {
+            // Delete uploaded files if property not found
+            if (req.files) {
+                req.files.forEach(file => {
+                    fs.unlink(file.path, err => {
+                        if (err) console.error('Error deleting file:', err);
+                    });
+                });
+            }
+            return res.status(404).json({
+                success: false,
+                error: 'Property not found.'
+            });
+        }
+        
+        const property = properties[0];
+        
+        // Agents can only upload photos to their assigned properties
+        if (req.user.role === 'agent' && property.assigned_agent_id !== req.user.id) {
+            // Delete uploaded files if not authorized
+            if (req.files) {
+                req.files.forEach(file => {
+                    fs.unlink(file.path, err => {
+                        if (err) console.error('Error deleting file:', err);
+                    });
+                });
+            }
+            return res.status(403).json({
+                success: false,
+                error: 'You can only upload photos to properties assigned to you.'
+            });
+        }
+        
+        if (!req.files || req.files.length === 0) {
+            return res.status(400).json({
+                success: false,
+                error: 'No files uploaded.'
+            });
+        }
+        
+        // Check if property has any photos
+        const existingPhotos = await db.query(
+            'SELECT COUNT(*) as count FROM property_photos WHERE property_id = ?',
+            [id]
+        );
+        const hasExistingPhotos = existingPhotos[0].count > 0;
+        
+        // Insert photo records
+        const insertedPhotos = [];
+        for (let i = 0; i < req.files.length; i++) {
+            const file = req.files[i];
+            // First uploaded photo is primary if no existing photos
+            const isPrimary = !hasExistingPhotos && i === 0;
+            
+            const result = await db.query(`
+                INSERT INTO property_photos (property_id, filename, original_filename, is_primary, display_order, uploaded_by)
+                VALUES (?, ?, ?, ?, ?, ?)
+            `, [id, file.filename, file.originalname, isPrimary, existingPhotos[0].count + i, req.user.id]);
+            
+            insertedPhotos.push({
+                id: result.insertId,
+                filename: file.filename,
+                original_filename: file.originalname,
+                is_primary: isPrimary,
+                display_order: existingPhotos[0].count + i
+            });
+        }
+        
+        console.log(`[PROPERTY] ${req.files.length} photos uploaded for property ${id} by ${req.user.role} ${req.user.id}`);
+        
+        res.status(201).json({
+            success: true,
+            message: `${req.files.length} photo(s) uploaded successfully.`,
+            photos: insertedPhotos
+        });
+        
+    } catch (error) {
+        console.error('Upload photos error:', error);
+        // Clean up uploaded files on error
+        if (req.files) {
+            req.files.forEach(file => {
+                fs.unlink(file.path, err => {
+                    if (err) console.error('Error deleting file:', err);
+                });
+            });
+        }
+        res.status(500).json({
+            success: false,
+            error: 'Failed to upload photos.'
+        });
+    }
+});
+
+/**
+ * PUT /api/properties/:propertyId/photos/:photoId/primary
+ * Set a photo as the primary image for a property
+ * Admin/Agent only
+ */
+router.put('/:propertyId/photos/:photoId/primary', authenticate, requireRole('admin', 'agent'), async (req, res) => {
+    try {
+        const { propertyId, photoId } = req.params;
+        
+        // Check if property exists
+        const properties = await db.query('SELECT * FROM properties WHERE id = ?', [propertyId]);
+        
+        if (properties.length === 0) {
+            return res.status(404).json({
+                success: false,
+                error: 'Property not found.'
+            });
+        }
+        
+        const property = properties[0];
+        
+        // Agents can only modify their assigned properties
+        if (req.user.role === 'agent' && property.assigned_agent_id !== req.user.id) {
+            return res.status(403).json({
+                success: false,
+                error: 'You can only modify photos for properties assigned to you.'
+            });
+        }
+        
+        // Check if photo exists and belongs to this property
+        const photos = await db.query(
+            'SELECT * FROM property_photos WHERE id = ? AND property_id = ?',
+            [photoId, propertyId]
+        );
+        
+        if (photos.length === 0) {
+            return res.status(404).json({
+                success: false,
+                error: 'Photo not found.'
+            });
+        }
+        
+        // Update: set all photos to non-primary, then set this one as primary
+        await db.query('UPDATE property_photos SET is_primary = FALSE WHERE property_id = ?', [propertyId]);
+        await db.query('UPDATE property_photos SET is_primary = TRUE WHERE id = ?', [photoId]);
+        
+        res.json({
+            success: true,
+            message: 'Primary photo updated successfully.'
+        });
+        
+    } catch (error) {
+        console.error('Set primary photo error:', error);
+        res.status(500).json({
+            success: false,
+            error: 'Failed to set primary photo.'
+        });
+    }
+});
+
+/**
+ * DELETE /api/properties/:propertyId/photos/:photoId
+ * Delete a property photo
+ * Admin/Agent only
+ */
+router.delete('/:propertyId/photos/:photoId', authenticate, requireRole('admin', 'agent'), async (req, res) => {
+    try {
+        const { propertyId, photoId } = req.params;
+        
+        // Check if property exists
+        const properties = await db.query('SELECT * FROM properties WHERE id = ?', [propertyId]);
+        
+        if (properties.length === 0) {
+            return res.status(404).json({
+                success: false,
+                error: 'Property not found.'
+            });
+        }
+        
+        const property = properties[0];
+        
+        // Agents can only delete photos from their assigned properties
+        if (req.user.role === 'agent' && property.assigned_agent_id !== req.user.id) {
+            return res.status(403).json({
+                success: false,
+                error: 'You can only delete photos from properties assigned to you.'
+            });
+        }
+        
+        // Check if photo exists and belongs to this property
+        const photos = await db.query(
+            'SELECT * FROM property_photos WHERE id = ? AND property_id = ?',
+            [photoId, propertyId]
+        );
+        
+        if (photos.length === 0) {
+            return res.status(404).json({
+                success: false,
+                error: 'Photo not found.'
+            });
+        }
+        
+        const photo = photos[0];
+        
+        // Delete file from disk
+        const filePath = path.join(uploadsDir, photo.filename);
+        if (fs.existsSync(filePath)) {
+            fs.unlinkSync(filePath);
+        }
+        
+        // Delete record from database
+        await db.query('DELETE FROM property_photos WHERE id = ?', [photoId]);
+        
+        // If deleted photo was primary, make first remaining photo primary
+        if (photo.is_primary) {
+            const remainingPhotos = await db.query(
+                'SELECT id FROM property_photos WHERE property_id = ? ORDER BY display_order ASC LIMIT 1',
+                [propertyId]
+            );
+            if (remainingPhotos.length > 0) {
+                await db.query('UPDATE property_photos SET is_primary = TRUE WHERE id = ?', [remainingPhotos[0].id]);
+            }
+        }
+        
+        console.log(`[PROPERTY] Photo ${photoId} deleted from property ${propertyId} by ${req.user.role} ${req.user.id}`);
+        
+        res.json({
+            success: true,
+            message: 'Photo deleted successfully.'
+        });
+        
+    } catch (error) {
+        console.error('Delete photo error:', error);
+        res.status(500).json({
+            success: false,
+            error: 'Failed to delete photo.'
+        });
+    }
+});
+
+// Handle multer errors
+router.use((error, req, res, next) => {
+    if (error instanceof multer.MulterError) {
+        if (error.code === 'LIMIT_FILE_SIZE') {
+            return res.status(400).json({
+                success: false,
+                error: 'File too large. Maximum size is 5MB.'
+            });
+        }
+        if (error.code === 'LIMIT_FILE_COUNT') {
+            return res.status(400).json({
+                success: false,
+                error: 'Too many files. Maximum is 10 files per upload.'
+            });
+        }
+        return res.status(400).json({
+            success: false,
+            error: 'File upload error: ' + error.message
+        });
+    }
+    if (error.message && error.message.includes('Only image files')) {
+        return res.status(400).json({
+            success: false,
+            error: error.message
+        });
+    }
+    next(error);
 });
 
 module.exports = router;

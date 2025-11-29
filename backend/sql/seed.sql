@@ -103,3 +103,27 @@ SELECT 2, id, 1, 'active' FROM properties WHERE assigned_agent_id = 2;
 
 INSERT INTO agent_assignments (agent_id, property_id, assigned_by, status)
 SELECT 3, id, 1, 'active' FROM properties WHERE assigned_agent_id = 3;
+
+-- ============================================================================
+-- SEED PROPERTY PHOTOS (Sample placeholders)
+-- ============================================================================
+-- Note: These are placeholder references. In production, actual files would
+-- be uploaded and stored in backend/uploads/images/
+-- The seed demonstrates the data structure; real images should be uploaded
+-- via the API endpoints.
+-- ============================================================================
+
+-- Property 1: Modern Downtown Condo (using existing image_url as reference)
+INSERT INTO property_photos (property_id, filename, original_filename, is_primary, display_order, uploaded_by)
+VALUES (1, 'sample-condo-1.jpg', 'condo-main.jpg', TRUE, 0, 1);
+
+-- Property 2: Spacious Family Home
+INSERT INTO property_photos (property_id, filename, original_filename, is_primary, display_order, uploaded_by)
+VALUES (2, 'sample-house-1.jpg', 'family-home.jpg', TRUE, 0, 1);
+
+-- Property 3: Luxury Waterfront Estate (multiple images)
+INSERT INTO property_photos (property_id, filename, original_filename, is_primary, display_order, uploaded_by)
+VALUES 
+    (3, 'sample-estate-1.jpg', 'waterfront-main.jpg', TRUE, 0, 1),
+    (3, 'sample-estate-2.jpg', 'waterfront-dock.jpg', FALSE, 1, 1),
+    (3, 'sample-estate-3.jpg', 'waterfront-interior.jpg', FALSE, 2, 1);

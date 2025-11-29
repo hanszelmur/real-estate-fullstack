@@ -99,6 +99,109 @@ function renderStars(rating) {
 }
 
 /**
+ * Get all property images (uploaded photos + legacy image_url)
+ */
+function getPropertyImages(property) {
+    const images = [];
+    
+    // Add uploaded photos first (they take priority)
+    if (property.photos && property.photos.length > 0) {
+        property.photos.forEach(photo => {
+            images.push({
+                url: `${CONFIG.API_URL.replace('/api', '')}/uploads/images/${photo.filename}`,
+                alt: photo.original_filename || 'Property photo',
+                isPrimary: photo.is_primary
+            });
+        });
+    }
+    
+    // Add legacy image_url if no uploaded photos and it's a valid URL
+    if (images.length === 0 && property.image_url && /^https?:\/\//i.test(property.image_url)) {
+        images.push({
+            url: property.image_url,
+            alt: property.title,
+            isPrimary: true
+        });
+    }
+    
+    return images;
+}
+
+/**
+ * Render image gallery HTML
+ */
+function renderImageGallery(images, title) {
+    if (images.length === 0) {
+        return `<div class="property-detail-image no-image"><span class="placeholder-icon">🏠</span></div>`;
+    }
+    
+    if (images.length === 1) {
+        return `
+            <div class="property-detail-image">
+                <img src="${images[0].url}" alt="${escapeHtml(title)}">
+            </div>
+        `;
+    }
+    
+    // Multiple images - create gallery
+    return `
+        <div class="property-gallery" id="propertyGallery">
+            <div class="gallery-main">
+                <button class="gallery-nav-btn gallery-prev" onclick="changeGalleryImage(-1)">❮</button>
+                <img src="${images[0].url}" alt="${escapeHtml(title)}" id="galleryMainImage">
+                <button class="gallery-nav-btn gallery-next" onclick="changeGalleryImage(1)">❯</button>
+            </div>
+            <div class="gallery-thumbnails">
+                ${images.map((img, index) => `
+                    <div class="gallery-thumb ${index === 0 ? 'active' : ''}" onclick="selectGalleryImage(${index})">
+                        <img src="${img.url}" alt="${escapeHtml(img.alt)}">
+                    </div>
+                `).join('')}
+            </div>
+        </div>
+    `;
+}
+
+// Gallery state
+let currentGalleryIndex = 0;
+let galleryImages = [];
+
+/**
+ * Change gallery image by direction
+ */
+function changeGalleryImage(direction) {
+    if (galleryImages.length === 0) return;
+    
+    currentGalleryIndex = (currentGalleryIndex + direction + galleryImages.length) % galleryImages.length;
+    updateGalleryDisplay();
+}
+
+/**
+ * Select specific gallery image
+ */
+function selectGalleryImage(index) {
+    if (index >= 0 && index < galleryImages.length) {
+        currentGalleryIndex = index;
+        updateGalleryDisplay();
+    }
+}
+
+/**
+ * Update gallery display
+ */
+function updateGalleryDisplay() {
+    const mainImage = document.getElementById('galleryMainImage');
+    if (mainImage && galleryImages[currentGalleryIndex]) {
+        mainImage.src = galleryImages[currentGalleryIndex].url;
+    }
+    
+    // Update thumbnail active state
+    document.querySelectorAll('.gallery-thumb').forEach((thumb, index) => {
+        thumb.classList.toggle('active', index === currentGalleryIndex);
+    });
+}
+
+/**
  * Render property details
  */
 function renderPropertyDetail(property) {
@@ -122,17 +225,12 @@ function renderPropertyDetail(property) {
     const safeAgentEmail = escapeHtml(property.agent_email);
     const safeAgentPhone = escapeHtml(property.agent_phone);
     
-    // For image URL, only allow http/https URLs to prevent javascript: injection
-    const safeImageUrl = property.image_url && /^https?:\/\//i.test(property.image_url) 
-        ? property.image_url 
-        : null;
+    // Get all property images (uploaded photos + legacy)
+    galleryImages = getPropertyImages(property);
+    currentGalleryIndex = 0;
     
     container.innerHTML = `
-        <div class="property-detail-image">
-            ${safeImageUrl 
-                ? `<img src="${safeImageUrl}" alt="${safeTitle}">`
-                : '🏠'}
-        </div>
+        ${renderImageGallery(galleryImages, property.title)}
         <div class="property-detail-content">
             <div class="property-detail-header">
                 <div>

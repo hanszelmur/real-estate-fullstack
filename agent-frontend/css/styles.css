@@ -680,3 +680,176 @@ body {
         align-items: flex-start;
     }
 }
+
+/* ============================================================================
+   Image Upload and Gallery Styles
+   ============================================================================ */
+
+/* Form help text */
+.form-help {
+    color: #666;
+    font-size: 0.85rem;
+    margin-top: 5px;
+    display: block;
+}
+
+/* Image Preview Container */
+.image-preview-container {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-top: 10px;
+    margin-bottom: 15px;
+}
+
+.image-preview-item {
+    position: relative;
+    width: 100px;
+    height: 100px;
+    border-radius: 5px;
+    overflow: hidden;
+    border: 2px solid #ddd;
+}
+
+.image-preview-item img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.image-preview-item .remove-preview {
+    position: absolute;
+    top: 2px;
+    right: 2px;
+    background: rgba(231, 76, 60, 0.9);
+    color: white;
+    border: none;
+    border-radius: 50%;
+    width: 22px;
+    height: 22px;
+    cursor: pointer;
+    font-size: 14px;
+    line-height: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.image-preview-item .remove-preview:hover {
+    background: #c0392b;
+}
+
+/* Existing Photos Container */
+.existing-photos-container {
+    margin-top: 15px;
+    margin-bottom: 15px;
+}
+
+.existing-photos-container h4 {
+    margin-bottom: 10px;
+    color: #2c3e50;
+    font-size: 0.95rem;
+}
+
+.existing-photos-grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+}
+
+.existing-photo-item {
+    position: relative;
+    width: 100px;
+    height: 100px;
+    border-radius: 5px;
+    overflow: hidden;
+    border: 2px solid #ddd;
+}
+
+.existing-photo-item.primary {
+    border-color: #27ae60;
+}
+
+.existing-photo-item img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.existing-photo-item .photo-actions {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background: rgba(0, 0, 0, 0.7);
+    padding: 4px;
+    display: flex;
+    justify-content: space-around;
+}
+
+.existing-photo-item .photo-actions button {
+    background: transparent;
+    border: none;
+    color: white;
+    cursor: pointer;
+    font-size: 12px;
+    padding: 2px 5px;
+}
+
+.existing-photo-item .photo-actions button:hover {
+    color: #3498db;
+}
+
+.existing-photo-item .primary-badge {
+    position: absolute;
+    top: 2px;
+    left: 2px;
+    background: #27ae60;
+    color: white;
+    font-size: 10px;
+    padding: 2px 5px;
+    border-radius: 3px;
+}
+
+/* Property Image Gallery (for property cards) */
+.property-gallery {
+    position: relative;
+    height: 180px;
+    background: linear-gradient(135deg, #667eea, #764ba2);
+}
+
+.property-gallery img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.property-gallery .gallery-nav {
+    position: absolute;
+    bottom: 10px;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    gap: 5px;
+}
+
+.property-gallery .gallery-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.5);
+    cursor: pointer;
+}
+
+.property-gallery .gallery-dot.active {
+    background: white;
+}
+
+.property-gallery .no-image {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    color: white;
+    font-size: 3rem;
+}

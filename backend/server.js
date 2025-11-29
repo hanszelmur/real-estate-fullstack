@@ -18,6 +18,7 @@ require('dotenv').config();
 
 const express = require('express');
 const cors = require('cors');
+const path = require('path');
 const db = require('./config/database');
 
 // Import routes
@@ -49,6 +50,10 @@ app.use(cors({
     ],
     credentials: true
 }));
+
+// Serve uploaded images as static files
+// Images are accessible at /uploads/images/filename.jpg
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 // Parse JSON bodies
 app.use(express.json());
