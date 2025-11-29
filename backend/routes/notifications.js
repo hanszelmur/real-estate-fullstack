@@ -1,12 +1,45 @@
 /**
  * Notification Routes
  * 
- * Handles user notifications.
+ * @file notifications.js
+ * @description Handles in-app user notifications.
+ *              Notifications are stored in the database and displayed in the user's portal.
  * 
- * Endpoints:
+ * @module routes/notifications
+ * 
+ * ## Feature Overview
+ * 
+ * The notification system provides:
+ * - In-app messaging for important events
+ * - Read/unread status tracking
+ * - Type categorization (appointment, property, verification, system)
+ * 
+ * ## Notification Types
+ * 
+ * | Type | Description | Recipients |
+ * |------|-------------|------------|
+ * | appointment | Booking confirmations, cancellations, promotions | Customer, Agent |
+ * | property | Rating notifications, property updates | Agent |
+ * | verification | Phone verification status | Customer |
+ * | system | System announcements | All users |
+ * 
+ * ## Usage in Other Routes
+ * 
+ * Notifications are created by other modules when events occur:
+ * 
+ * @example Creating a notification in appointments.js:
+ * await db.query(`
+ *     INSERT INTO notifications (user_id, type, title, message)
+ *     VALUES (?, 'appointment', 'Booking Confirmed!', ?)
+ * `, [customerId, 'Your appointment has been confirmed!']);
+ * 
+ * ## Endpoints
+ * 
  * - GET /api/notifications - List user's notifications
  * - PUT /api/notifications/:id/read - Mark notification as read
  * - PUT /api/notifications/read-all - Mark all notifications as read
+ * 
+ * @see backend/utils/auditLogger.js for audit logging (separate from user notifications)
  */
 
 const express = require('express');
