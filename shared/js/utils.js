@@ -267,3 +267,34 @@ if (typeof module !== 'undefined' && module.exports) {
         showToast
     };
 }
+
+/**
+ * Get the base URL for serving static files (e.g., uploaded images)
+ * Derives from CONFIG.API_URL by removing the /api path
+ * 
+ * @returns {string} Base URL for static files
+ * 
+ * @example
+ * // CONFIG.API_URL = 'http://localhost:3000/api'
+ * getUploadsBaseUrl(); // Returns: 'http://localhost:3000'
+ */
+function getUploadsBaseUrl() {
+    if (typeof CONFIG !== 'undefined' && CONFIG.API_URL) {
+        return CONFIG.API_URL.replace('/api', '');
+    }
+    return 'http://localhost:3000';
+}
+
+/**
+ * Get the full URL for an uploaded image
+ * 
+ * @param {string} filename - The filename of the uploaded image
+ * @returns {string} Full URL to the image
+ * 
+ * @example
+ * getUploadedImageUrl('property-123.jpg');
+ * // Returns: 'http://localhost:3000/uploads/images/property-123.jpg'
+ */
+function getUploadedImageUrl(filename) {
+    return `${getUploadsBaseUrl()}/uploads/images/${filename}`;
+}
