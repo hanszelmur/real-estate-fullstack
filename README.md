@@ -28,6 +28,8 @@
 - [API Reference](#-api-reference)
 - [Database Schema](#-database-schema)
 - [Fullstack vs Frontend-Only Comparison](#-fullstack-vs-frontend-only-comparison)
+- [Troubleshooting](#-troubleshooting)
+- [User Experience Critique](#-user-experience-critique)
 - [Roadmap & TODO](#-roadmap--todo)
 - [Security Notes](#-security-notes)
 - [License](#-license)
@@ -627,40 +629,74 @@ serve admin-frontend -l 3003
 
 ## 📸 Screenshots
 
-> **Note:** These placeholders indicate where screenshots should be added. Run the application locally to capture actual screenshots.
-
 ### Customer Portal
 
-| Screenshot | Description |
-|------------|-------------|
-| `screenshots/customer-home.png` | Homepage with featured properties and search |
-| `screenshots/customer-properties.png` | Property listing page with filters |
-| `screenshots/customer-property-detail.png` | Single property view with agent rating |
-| `screenshots/customer-booking-modal.png` | Booking modal with high-demand warning |
-| `screenshots/customer-appointments.png` | My appointments with status (confirmed/queued) |
-| `screenshots/customer-rating-modal.png` | Agent rating modal (1-5 stars + feedback) |
-| `screenshots/customer-queue-status.png` | Queued appointment showing position |
+The customer portal provides a clean, intuitive interface for browsing properties and scheduling viewings.
+
+**Homepage with Search and Featured Properties:**
+
+![Customer Homepage](screenshots/customer-home.png)
+
+*The homepage features a hero section with property search, and displays featured listings from the database.*
+
+| Page | Description |
+|------|-------------|
+| Homepage | Hero banner with search, featured properties grid |
+| Properties | Full listing with filters (city, price, type, bedrooms) |
+| Property Detail | Full details, image gallery, agent info with ratings, booking button |
+| My Appointments | View all bookings with status (pending/confirmed/queued/completed) |
+| Rating Modal | 1-5 star rating with optional feedback after completed viewings |
 
 ### Agent Portal
 
-| Screenshot | Description |
-|------------|-------------|
-| `screenshots/agent-dashboard.png` | Dashboard with statistics and rating display |
-| `screenshots/agent-properties.png` | Assigned properties list |
-| `screenshots/agent-property-form.png` | Add/Edit property modal |
-| `screenshots/agent-appointments.png` | Appointment management with status tabs |
-| `screenshots/agent-appointment-update.png` | Update appointment status modal |
+The agent portal provides tools for managing assigned properties and appointments.
+
+**Agent Login Screen:**
+
+![Agent Portal Login](screenshots/agent-dashboard.png)
+
+*Agents log in with credentials created by administrators. The portal shows agent accounts are admin-created only.*
+
+| Page | Description |
+|------|-------------|
+| Dashboard | Statistics overview, rating display, upcoming appointments, notifications |
+| My Properties | Grid of assigned properties with edit capability |
+| Add/Edit Property | Form with image upload, property details, status management |
+| Appointments | Tabbed view (pending/confirmed/completed/cancelled), status update modal |
 
 ### Admin Portal
 
-| Screenshot | Description |
-|------------|-------------|
-| `screenshots/admin-dashboard.png` | Overview statistics (users, properties, appointments) |
-| `screenshots/admin-users.png` | User management table with role filters |
-| `screenshots/admin-user-edit.png` | User edit modal (role, status, password) |
-| `screenshots/admin-properties.png` | All properties with status/type filters |
-| `screenshots/admin-property-form.png` | Property form with agent assignment |
-| `screenshots/admin-appointments.png` | All appointments oversight |
+The admin portal provides full system control and oversight.
+
+**Admin Login Screen:**
+
+![Admin Dashboard Login](screenshots/admin-dashboard.png)
+
+*Admin access is restricted. The login page clearly indicates this is for administrators only.*
+
+| Page | Description |
+|------|-------------|
+| Dashboard | System statistics (users, properties, appointments, active agents) |
+| Users | Full user management with role/status filters, edit modal |
+| Properties | All properties regardless of status, agent assignment, featured flag |
+| Appointments | Complete appointment oversight with edit/delete capabilities |
+
+### Property Add Flow & Image Upload
+
+**Adding a Property (Agent/Admin):**
+
+1. Navigate to Properties page → Click "Add Property"
+2. Fill in required fields (title, address, city, state, zip, price, type)
+3. Select property images using the file input (max 5MB each, max 10 files)
+4. Images preview before upload
+5. Submit form → Property created → Images uploaded
+
+**Image Gallery Display (Customer View):**
+
+- Property detail page shows a navigable image gallery
+- Primary image displayed prominently
+- Thumbnail navigation for multiple images
+- Fallback to placeholder emoji (🏠) if no images
 
 ---
 
@@ -1092,13 +1128,226 @@ This fullstack application differs significantly from frontend-only demos (like 
 
 ---
 
+## 🔧 Troubleshooting
+
+### Common Issues and Solutions
+
+#### 1. "Cannot find module 'multer'" or Image Upload Errors
+
+**Symptom:** Server crashes on startup or image upload fails with module not found error.
+
+**Solution:**
+```bash
+cd backend
+npm install multer
+```
+
+The `multer` package is required for multipart/form-data handling (image uploads). Ensure it's in your `package.json` dependencies.
+
+#### 2. "ECONNREFUSED" or "Failed to load properties"
+
+**Symptom:** Frontend shows "Failed to load properties" or connection errors.
+
+**Causes & Solutions:**
+- **Backend not running:** Start the backend with `cd backend && npm start`
+- **Wrong API URL:** Check `frontend/js/config.js` - API_URL should be `http://localhost:3000/api`
+- **Database not running:** Ensure MySQL is running: `sudo service mysql start`
+- **Database not configured:** Check `.env` file has correct DB credentials
+
+#### 3. "Access denied for user" (MySQL)
+
+**Symptom:** Backend fails to start with MySQL access denied error.
+
+**Solution:**
+```bash
+# Check your .env file
+DB_HOST=localhost
+DB_USER=root
+DB_PASSWORD=your_actual_password
+DB_NAME=real_estate_db
+DB_PORT=3306
+```
+
+#### 4. "Table doesn't exist" Errors
+
+**Symptom:** Backend starts but API calls fail with table errors.
+
+**Solution:**
+```bash
+# Run schema and seed in order
+mysql -u root -p real_estate_db < backend/sql/schema.sql
+mysql -u root -p real_estate_db < backend/sql/seed.sql
+```
+
+#### 5. Image Upload Fails with "File too large"
+
+**Symptom:** Upload rejected with size error.
+
+**Solution:** Images must be under 5MB each. The limit is configured in `backend/routes/properties.js`:
+```javascript
+limits: {
+    fileSize: 5 * 1024 * 1024, // 5MB max
+    files: 10 // Max 10 files per upload
+}
+```
+
+#### 6. "Only image files are allowed" Error
+
+**Symptom:** Upload rejected despite selecting an image.
+
+**Solution:** Only these MIME types are allowed:
+- `image/jpeg`, `image/jpg`, `image/png`, `image/gif`, `image/webp`
+
+Check that your file extension matches the actual file type.
+
+#### 7. Verification Code Not Received
+
+**Symptom:** After registration, no SMS code arrives.
+
+**Solution:** This is a demo app - SMS codes are **logged to the backend console**, not actually sent. Check your terminal running `npm start` for output like:
+```
+[VERIFICATION] Code 123456 sent to +1-555-555-5555
+```
+
+#### 8. CORS Errors in Browser Console
+
+**Symptom:** API calls fail with CORS policy errors.
+
+**Solution:** Ensure you're accessing frontends from the configured origins:
+- Customer: `http://localhost:3001` (not `127.0.0.1`)
+- Agent: `http://localhost:3002`
+- Admin: `http://localhost:3003`
+
+If using different ports, update `backend/server.js` CORS configuration.
+
+#### 9. "Property not found" After Creation
+
+**Symptom:** Property created but doesn't appear in listings.
+
+**Causes:**
+- **Status filter:** Non-admin users only see `available` properties. New properties default to `available`, but check the status.
+- **Agent assignment:** If you're an agent, you can only see properties assigned to you.
+
+#### 10. Port Already in Use
+
+**Symptom:** `Error: listen EADDRINUSE :::3000`
+
+**Solution:**
+```bash
+# Find process using the port
+lsof -i :3000
+# Kill it
+kill -9 <PID>
+# Or use a different port
+PORT=4000 npm start
+```
+
+### Common Gotchas
+
+| Gotcha | Explanation |
+|--------|-------------|
+| **Agents can't delete properties** | By design - only admins can delete to prevent accidental data loss |
+| **Customers must verify phone** | Unverified customers can browse but cannot book appointments |
+| **Queue position starts at 1** | First person in queue is position #1, not #0 |
+| **Agents auto-assigned to their properties** | When agents create properties, they're automatically the assigned agent |
+| **Featured flag is admin-only** | Agents cannot mark properties as featured |
+| **Rating requires completed appointment** | Customers can only rate after an agent marks the viewing as completed |
+| **One rating per appointment** | You cannot submit multiple ratings for the same appointment |
+| **Image URLs stored separately** | Legacy `image_url` field and new `property_photos` table are both supported |
+
+---
+
+## 👤 User Experience Critique
+
+### Customer Portal
+
+**Strengths:**
+- ✅ Clean, modern interface with intuitive navigation
+- ✅ Property search and filtering work well
+- ✅ Booking flow includes helpful warnings about high-demand slots
+- ✅ Queue position clearly displayed for waitlisted bookings
+- ✅ Agent ratings visible before booking
+
+**Areas for Improvement:**
+| Issue | Impact | Suggestion |
+|-------|--------|------------|
+| No saved/favorite properties | Users must re-find properties | Add favorites feature |
+| Limited search filters | Hard to narrow down properties | Add bedrooms, price range, amenities filters |
+| No map view | Location context missing | Integrate Google Maps/Mapbox |
+| No property comparison | Difficult to compare options | Side-by-side comparison feature |
+| Phone verification is console-based | Confusing for users | Implement real SMS or email verification |
+| No password reset | Locked out users have no recourse | Add forgot password flow |
+| No appointment reminders | Users may forget viewings | Email/SMS reminders before appointments |
+
+**Potential UX Bugs:**
+- When backend is down, "Failed to load properties" message could be more helpful
+- No loading states on some buttons during form submission
+- Modal close behavior inconsistent (some close on outside click, some don't)
+
+### Agent Portal
+
+**Strengths:**
+- ✅ Dashboard shows key metrics at a glance
+- ✅ Rating summary prominently displayed
+- ✅ Appointment management with clear status indicators
+- ✅ Image upload with preview before saving
+
+**Areas for Improvement:**
+| Issue | Impact | Suggestion |
+|-------|--------|------------|
+| No calendar view for appointments | Hard to see schedule | Add weekly/monthly calendar |
+| Cannot block time slots from UI | Manual availability management | Add blocking feature in frontend |
+| No bulk operations | Time-consuming for many properties | Bulk status updates |
+| Limited property analytics | No performance insights | Add views, inquiries metrics |
+| No customer contact history | Context lost between viewings | Show previous interactions |
+
+**Potential UX Bugs:**
+- Appointment update success message appears briefly, might be missed
+- When editing property, existing images load after form is already displayed
+- No confirmation when navigating away from unsaved form changes
+
+### Admin Portal
+
+**Strengths:**
+- ✅ Comprehensive system overview on dashboard
+- ✅ Full CRUD on all entities
+- ✅ User role management works well
+- ✅ Can see all appointments regardless of status
+
+**Areas for Improvement:**
+| Issue | Impact | Suggestion |
+|-------|--------|------------|
+| No analytics/charts | Hard to spot trends | Add visual analytics dashboard |
+| No audit log viewer | Can't see who changed what | Show change history |
+| No bulk user management | Slow for large user bases | Bulk activate/deactivate |
+| No export functionality | Reporting is manual | CSV/PDF export |
+| Limited search in tables | Hard to find specific records | Add search/filter to all tables |
+| No system health monitoring | Issues discovered reactively | Add health dashboard |
+
+**Potential UX Bugs:**
+- Delete confirmation is a basic `confirm()` dialog - could be more informative
+- When deleting a user, cascading effects not shown (appointments, ratings deleted)
+- Pagination controls could be more visible
+
+### General Recommendations
+
+1. **Accessibility:** Add ARIA labels, keyboard navigation, screen reader support
+2. **Mobile Responsiveness:** Current CSS is basic - needs mobile-first redesign
+3. **Error Handling:** More specific error messages with actionable guidance
+4. **Loading States:** Consistent loading indicators across all async operations
+5. **Form Validation:** Real-time validation feedback as users type
+6. **Empty States:** Better messaging when lists are empty (e.g., "No appointments yet")
+7. **Session Timeout:** Warn users before token expiration, handle graceful re-login
+
+---
+
 ## 🗺 Roadmap & TODO
 
 ### Missing Features (Common in Production Real Estate Apps)
 
 #### High Priority
+- [x] **Document Upload System** - Property photos, floor plans (✅ Implemented)
 - [ ] **Admin Analytics Dashboard** - Charts for bookings over time, agent performance, property trends
-- [ ] **Document Upload System** - Property photos, floor plans, compliance documents
 - [ ] **Saved/Favorited Properties** - Customers can save properties for later
 - [ ] **Search History** - Track recent searches per user
 - [ ] **Email Notifications** - Replace console SMS with real email (SendGrid, SES)

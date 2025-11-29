@@ -448,6 +448,114 @@ If upgrading from a previous version without image upload support:
 
 ---
 
+## 🔧 Troubleshooting Quick Reference
+
+### Backend Won't Start
+
+| Error | Solution |
+|-------|----------|
+| `Cannot find module 'multer'` | Run `npm install` in backend directory |
+| `ECONNREFUSED` to MySQL | Start MySQL: `sudo service mysql start` |
+| `Access denied for user` | Check `.env` credentials match MySQL setup |
+| `Table doesn't exist` | Run `schema.sql` then `seed.sql` |
+| `EADDRINUSE` | Kill process on port or use different port |
+
+### Frontend Issues
+
+| Error | Solution |
+|-------|----------|
+| `Failed to load properties` | Check backend is running on port 3000 |
+| CORS errors | Use `localhost` not `127.0.0.1`, check ports match config |
+| Login fails silently | Check browser console, verify API URL in config.js |
+| Images not displaying | Verify uploads directory exists and has permissions |
+
+### Image Upload Issues
+
+| Error | Solution |
+|-------|----------|
+| `File too large` | Images must be under 5MB |
+| `Only image files allowed` | Check file is actually an image (JPEG, PNG, GIF, WebP) |
+| Images upload but don't display | Check static file serving in server.js, verify file exists in uploads/ |
+
+---
+
+## 🧭 Common Workflows
+
+### Adding a Property with Images (Agent/Admin)
+
+```
+1. Login to Agent (3002) or Admin (3003) portal
+2. Navigate to Properties
+3. Click "Add Property" button
+4. Fill required fields:
+   - Title, Address, City, State, ZIP
+   - Price, Property Type, Listing Type
+5. (Optional) Add description, bedrooms, bathrooms, etc.
+6. Click "Choose Files" to select images
+7. Preview images in the form
+8. Click Save
+9. Images are uploaded after property creation
+```
+
+### Managing Existing Property Photos
+
+```
+1. Edit an existing property
+2. Scroll to "Existing Photos" section
+3. To set primary: Click ★ icon on desired photo
+4. To delete: Click 🗑 icon (with confirmation)
+5. To add more: Use file input, then save
+```
+
+### Processing an Appointment (Agent)
+
+```
+1. Login to Agent portal
+2. Go to Appointments tab
+3. Filter by "Pending"
+4. Click "Update" on an appointment
+5. Change status to "Confirmed"
+6. (After viewing) Change status to "Completed"
+7. Customer can now rate you
+```
+
+### Rating an Agent (Customer)
+
+```
+1. Complete a viewing (agent marks as completed)
+2. Go to My Appointments
+3. Find the completed appointment
+4. Click "Rate Agent" button
+5. Select 1-5 stars
+6. (Optional) Add written feedback
+7. Submit - agent sees rating in their dashboard
+```
+
+---
+
+## 📋 Required Dependencies
+
+### Backend (package.json)
+
+| Package | Version | Purpose |
+|---------|---------|---------|
+| `express` | ^4.18.2 | Web framework |
+| `mysql` | ^2.18.1 | MySQL driver |
+| `bcryptjs` | ^2.4.3 | Password hashing |
+| `cors` | ^2.8.5 | Cross-origin requests |
+| `dotenv` | ^16.3.1 | Environment variables |
+| `multer` | ^2.0.2 | File uploads |
+
+### Frontend
+
+No npm dependencies - vanilla HTML/CSS/JS with optional `serve` for hosting:
+
+```bash
+npm install -g serve
+```
+
+---
+
 ## ❓ FAQ
 
 **Q: How do I change the API URL?**  
@@ -461,3 +569,44 @@ A: Use the seed.sql pattern to INSERT a user with `role='admin'` and a bcrypt pa
 
 **Q: Why can't a customer confirm their own appointment?**  
 A: Business rule: appointments must be confirmed by agents to ensure availability.
+
+**Q: Why don't I see properties I just created?**  
+A: Check the status - customers only see "available" properties. Agents only see their assigned properties.
+
+**Q: How do I reset a user's password?**  
+A: Admin can edit any user and set a new password via the Admin portal.
+
+**Q: Why is my image not showing?**  
+A: Check: (1) File uploaded successfully (2) Backend serves /uploads as static (3) Filename in property_photos table matches actual file
+
+**Q: Can I use external image URLs?**  
+A: Yes, the legacy `image_url` field still works. New uploads use `property_photos` table.
+
+**Q: How does queue promotion work?**  
+A: When a booking is cancelled, the system automatically promotes the first queued customer (by booking timestamp) to confirmed status and sends them a notification.
+
+**Q: Why can't I delete properties as an agent?**  
+A: By design - only admins can delete properties to prevent accidental data loss. Agents can edit properties but not delete them.
+
+---
+
+## 📝 UX Findings Summary
+
+### Key Issues Identified
+
+1. **No password recovery** - Users locked out have no self-service option
+2. **Console-based SMS** - Confusing for new users expecting real SMS
+3. **Limited mobile support** - UI not optimized for mobile devices
+4. **No loading indicators** - Some forms submit without visual feedback
+5. **Inconsistent modals** - Close behavior varies between modals
+6. **No empty states** - Lists show generic messages when empty
+
+### Recommended Priorities
+
+1. Add forgot password functionality
+2. Implement real email/SMS verification
+3. Make UI mobile-responsive
+4. Add consistent loading states
+5. Improve error messages with guidance
+
+See README.md for detailed UX critique by role.
