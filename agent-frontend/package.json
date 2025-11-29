@@ -1,0 +1,19 @@
+{
+  "name": "agent-frontend",
+  "version": "1.0.0",
+  "description": "Real Estate Agent Portal - Static HTML/CSS/JS frontend",
+  "main": "index.html",
+  "scripts": {
+    "start": "npx serve . -l 3002",
+    "serve": "npx serve . -l 3002",
+    "dev": "npx serve . -l 3002"
+  },
+  "keywords": ["real-estate", "agent", "frontend"],
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {},
+  "notes": {
+    "alternative_python": "python -m http.server 3002",
+    "alternative_npx": "npx http-server . -p 3002"
+  }
+}

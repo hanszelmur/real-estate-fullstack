@@ -1,0 +1,19 @@
+{
+  "name": "admin-frontend",
+  "version": "1.0.0",
+  "description": "Real Estate Admin Portal - Static HTML/CSS/JS frontend",
+  "main": "index.html",
+  "scripts": {
+    "start": "npx serve . -l 3003",
+    "serve": "npx serve . -l 3003",
+    "dev": "npx serve . -l 3003"
+  },
+  "keywords": ["real-estate", "admin", "frontend"],
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {},
+  "notes": {
+    "alternative_python": "python -m http.server 3003",
+    "alternative_npx": "npx http-server . -p 3003"
+  }
+}

@@ -1,0 +1,19 @@
+{
+  "name": "customer-frontend",
+  "version": "1.0.0",
+  "description": "Real Estate Customer Portal - Static HTML/CSS/JS frontend",
+  "main": "index.html",
+  "scripts": {
+    "start": "npx serve . -l 3001",
+    "serve": "npx serve . -l 3001",
+    "dev": "npx serve . -l 3001"
+  },
+  "keywords": ["real-estate", "customer", "frontend"],
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {},
+  "notes": {
+    "alternative_python": "python -m http.server 3001",
+    "alternative_npx": "npx http-server . -p 3001"
+  }
+}

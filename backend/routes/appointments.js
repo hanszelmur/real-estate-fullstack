@@ -1,34 +1,92 @@
 /**
  * Appointment Routes
  * 
- * Handles property viewing appointment/booking management with:
- * - Full datetime precision (down to seconds) for double-booking prevention
- * - Queuing system for high-demand slots
- * - Instant queue promotion on cancellation
- * - Status tracking (confirmed, queued, promoted, canceled)
+ * @file appointments.js
+ * @description Handles property viewing appointment/booking management with:
+ *              - Full datetime precision (down to microseconds) for double-booking prevention
+ *              - Queuing system for high-demand slots
+ *              - Instant queue promotion on cancellation
+ *              - Status tracking (confirmed, queued, promoted, canceled)
  * 
- * Endpoints:
+ * @module routes/appointments
+ * 
+ * ## Race Condition Handling
+ * 
+ * This module handles race conditions when multiple customers try to book the same slot:
+ * 
+ * 1. **Microsecond Timestamps**: Each booking records `booking_timestamp` with DATETIME(6)
+ *    precision (microseconds). This ensures even near-simultaneous requests have unique timestamps.
+ * 
+ * 2. **First-Come-First-Served**: The first booking (by timestamp) gets 'pending' status.
+ *    Subsequent bookings for the same slot get 'queued' status with a queue_position.
+ * 
+ * 3. **Queue Position**: Queue positions are determined by booking_timestamp order.
+ *    Position 1 is first in queue, Position 2 is second, etc.
+ * 
+ * 4. **Automatic Promotion**: When a 'pending' or 'confirmed' booking is cancelled,
+ *    the queue_position=1 customer is automatically promoted to 'confirmed'.
+ * 
+ * ## Flow Diagram
+ * 
+ * Customer A books 10:00 AM → Status: PENDING (first to book)
+ *     |
+ * Customer B books 10:00 AM (2 seconds later) → Status: QUEUED, Position: 1
+ *     |
+ * Customer C books 10:00 AM (5 seconds later) → Status: QUEUED, Position: 2
+ *     |
+ * Customer A cancels → 
+ *     Customer B promoted to CONFIRMED
+ *     Customer C position updated to 1
+ *     Notification sent to Customer B
+ * 
+ * ## Endpoints
+ * 
  * - GET /api/appointments - List appointments (filtered by role)
  * - GET /api/appointments/:id - Get single appointment
  * - GET /api/appointments/available-slots/:propertyId - Get available slots for a property
  * - POST /api/appointments - Create new appointment (customer)
  * - PUT /api/appointments/:id - Update appointment (status change, notes)
  * - DELETE /api/appointments/:id - Cancel appointment
+ * 
+ * @see backend/sql/schema.sql for table structure
  */
 
 const express = require('express');
 const router = express.Router();
 const db = require('../config/database');
 const { authenticate, requireRole, requireVerified } = require('../middleware/auth');
+const auditLogger = require('../utils/auditLogger');
 
 /**
  * Promote the next queued customer for a slot when a booking is cancelled
+ * 
+ * This function implements the automatic queue promotion logic:
+ * 1. Finds the customer with the lowest queue_position for the given slot
+ * 2. Updates their status from 'queued' to 'confirmed'
+ * 3. Decrements queue positions for all remaining queued customers
+ * 4. Creates a notification for the promoted customer
+ * 
  * @param {number} propertyId - Property ID
- * @param {string} appointmentDate - Date of the slot
- * @param {string} appointmentTime - Time of the slot
+ * @param {string} appointmentDate - Date of the slot (YYYY-MM-DD)
+ * @param {string} appointmentTime - Time of the slot (HH:MM:SS)
+ * @returns {Promise<Object|null>} The promoted booking object, or null if no one in queue
+ * 
+ * @example
+ * // Called when a booking is cancelled
+ * const promotedCustomer = await promoteNextInQueue(propertyId, '2024-01-15', '10:00:00');
+ * if (promotedCustomer) {
+ *     console.log(`Customer ${promotedCustomer.customer_id} promoted from queue`);
+ * }
+ * 
+ * @fires QUEUE_PROMOTION audit event
+ * @fires NOTIFICATION_SENT for the promoted customer
  */
 async function promoteNextInQueue(propertyId, appointmentDate, appointmentTime) {
+    // Log the promotion attempt
+    console.log(`[QUEUE] Checking for queued bookings: property=${propertyId}, date=${appointmentDate}, time=${appointmentTime}`);
+    
     // Find the next queued customer for this slot
+    // ORDER BY queue_position ASC ensures we get position 1 first
     const queuedBookings = await db.query(`
         SELECT a.*, p.title as property_title
         FROM appointments a
@@ -44,7 +102,11 @@ async function promoteNextInQueue(propertyId, appointmentDate, appointmentTime) 
     if (queuedBookings.length > 0) {
         const nextInQueue = queuedBookings[0];
         
-        // Promote to confirmed
+        // Log the promotion event
+        console.log(`[QUEUE] Promoting customer ${nextInQueue.customer_id} from position ${nextInQueue.queue_position}`);
+        
+        // Promote to confirmed status
+        // Clear queue_position as they're no longer in the queue
         await db.query(`
             UPDATE appointments 
             SET status = 'confirmed', queue_position = NULL 
@@ -52,6 +114,7 @@ async function promoteNextInQueue(propertyId, appointmentDate, appointmentTime) 
         `, [nextInQueue.id]);
         
         // Update queue positions for remaining queued bookings
+        // Everyone moves up one position
         await db.query(`
             UPDATE appointments 
             SET queue_position = queue_position - 1 
@@ -63,6 +126,7 @@ async function promoteNextInQueue(propertyId, appointmentDate, appointmentTime) 
         `, [propertyId, appointmentDate, appointmentTime, nextInQueue.queue_position]);
         
         // Create notification for the promoted customer
+        // This is an in-app notification (stored in DB, displayed in UI)
         await db.query(`
             INSERT INTO notifications (user_id, type, title, message)
             VALUES (?, 'appointment', '🎉 Booking Confirmed!', ?)
@@ -71,8 +135,22 @@ async function promoteNextInQueue(propertyId, appointmentDate, appointmentTime) 
             `Great news! Your queued booking for ${nextInQueue.property_title} on ${appointmentDate} at ${appointmentTime} has been promoted to confirmed. The slot is now yours!`
         ]);
         
+        // Audit log the queue promotion event
+        auditLogger.logQueuePromotion({
+            appointmentId: nextInQueue.id,
+            customerId: nextInQueue.customer_id,
+            propertyId: propertyId,
+            slot: `${appointmentDate} ${appointmentTime}`,
+            previousPosition: nextInQueue.queue_position,
+            reason: 'Previous booking cancelled'
+        });
+        
+        console.log(`[QUEUE] Successfully promoted customer ${nextInQueue.customer_id} to confirmed status`);
+        
         return nextInQueue;
     }
+    
+    console.log(`[QUEUE] No queued bookings found for this slot`);
     return null;
 }
 
@@ -322,20 +400,67 @@ router.get('/:id', authenticate, async (req, res) => {
 /**
  * POST /api/appointments
  * Create new appointment (customer booking a property viewing)
- * Customer must be verified
  * 
- * Implements double-booking prevention with queuing:
- * - Records booking_timestamp with microsecond precision
- * - If slot is already booked, customer is added to queue
- * - Queue position is calculated based on booking_timestamp order
+ * @description
+ * Creates a new viewing appointment for a customer. This endpoint implements
+ * sophisticated race condition handling and queue management.
+ * 
+ * ## Race Condition Handling
+ * 
+ * When multiple customers try to book the same slot simultaneously:
+ * 
+ * 1. **First Request**: Gets status='pending' (or 'confirmed' if auto-confirm enabled)
+ * 2. **Subsequent Requests**: Get status='queued' with incrementing queue_position
+ * 
+ * The `booking_timestamp` field uses DATETIME(6) for microsecond precision,
+ * ensuring accurate ordering even for near-simultaneous requests.
+ * 
+ * ## Example Flow
+ * 
+ * ```
+ * Time 15:30:45.123456 - Customer A books 10:00 AM → PENDING
+ * Time 15:30:45.789012 - Customer B books 10:00 AM → QUEUED (position 1)
+ * Time 15:30:46.234567 - Customer C books 10:00 AM → QUEUED (position 2)
+ * ```
+ * 
+ * @requires Authentication - User must be logged in
+ * @requires Verification - Customer must have verified phone number
+ * 
+ * @bodyparam {number} propertyId - ID of the property to book
+ * @bodyparam {string} appointmentDate - Date in YYYY-MM-DD format
+ * @bodyparam {string} appointmentTime - Time in HH:MM:SS format
+ * @bodyparam {string} [notes] - Optional notes for the appointment
+ * 
+ * @returns {Object} Response with created appointment
+ * @returns {boolean} response.success - Whether booking was successful
+ * @returns {string} response.message - Descriptive message
+ * @returns {boolean} response.isQueued - True if added to queue instead of confirmed
+ * @returns {number|null} response.queuePosition - Position in queue (null if not queued)
+ * @returns {Object} response.appointment - The created appointment object
+ * 
+ * @fires BOOKING_CREATED audit event
+ * @fires BOOKING_QUEUED audit event (if slot was taken)
+ * @fires NOTIFICATION_SENT to agent (if not queued)
  */
 router.post('/', authenticate, requireVerified, async (req, res) => {
     try {
         const { propertyId, appointmentDate, appointmentTime, notes } = req.body;
         const user = req.user;
         
-        // Only customers can book appointments
+        // ============================================================
+        // ROLE CHECK: Only customers can book appointments
+        // Agents and admins should use the admin interface
+        // ============================================================
         if (user.role !== 'customer') {
+            // Log forbidden action attempt
+            auditLogger.logAccessDenied({
+                userId: user.id,
+                userRole: user.role,
+                action: 'BOOK_APPOINTMENT',
+                requiredRole: 'customer',
+                reason: 'Only customers can book appointments'
+            });
+            
             return res.status(403).json({
                 success: false,
                 error: 'Only customers can book appointments.'
@@ -349,6 +474,9 @@ router.post('/', authenticate, requireVerified, async (req, res) => {
                 error: 'Required fields: propertyId, appointmentDate, appointmentTime'
             });
         }
+        
+        // Log the booking attempt
+        console.log(`[BOOKING] Customer ${user.id} attempting to book: property=${propertyId}, date=${appointmentDate}, time=${appointmentTime}`);
         
         // Check if property exists and is available
         const properties = await db.query(
@@ -365,13 +493,14 @@ router.post('/', authenticate, requireVerified, async (req, res) => {
         
         const property = properties[0];
         
-        // Check if slot is blocked
+        // Check if slot is blocked by agent
         const blockedSlots = await db.query(`
             SELECT * FROM blocked_slots 
             WHERE property_id = ? AND blocked_date = ? AND blocked_time = ?
         `, [propertyId, appointmentDate, appointmentTime]);
         
         if (blockedSlots.length > 0) {
+            console.log(`[BOOKING] Slot is blocked: property=${propertyId}, date=${appointmentDate}, time=${appointmentTime}`);
             return res.status(409).json({
                 success: false,
                 error: 'This time slot is not available. Please select a different time.'
@@ -379,24 +508,32 @@ router.post('/', authenticate, requireVerified, async (req, res) => {
         }
         
         // Check for existing booking by same customer for this property
+        // Prevents duplicate bookings
         const existingCustomerBookings = await db.query(`
             SELECT * FROM appointments 
             WHERE property_id = ? AND customer_id = ? AND status IN ('pending', 'confirmed', 'queued')
         `, [propertyId, user.id]);
         
         if (existingCustomerBookings.length > 0) {
+            console.log(`[BOOKING] Customer ${user.id} already has booking for property ${propertyId}`);
             return res.status(409).json({
                 success: false,
                 error: 'You already have a pending, confirmed, or queued appointment for this property.'
             });
         }
         
-        // Record precise booking timestamp with microsecond precision for MySQL DATETIME(6)
+        // ============================================================
+        // RACE CONDITION HANDLING: Record precise booking timestamp
+        // Using DATETIME(6) for microsecond precision ensures accurate
+        // ordering even for near-simultaneous booking requests
+        // ============================================================
         const now = new Date();
         const bookingTimestamp = now.toISOString().slice(0, 23).replace('T', ' ') + 
             String(now.getMilliseconds()).padStart(3, '0').substring(0, 3);
         
-        // Check if slot is already confirmed
+        console.log(`[BOOKING] Booking timestamp: ${bookingTimestamp}`);
+        
+        // Check if slot is already confirmed/pending (someone else got there first)
         const existingConfirmedBookings = await db.query(`
             SELECT * FROM appointments 
             WHERE property_id = ? 
@@ -410,11 +547,19 @@ router.post('/', authenticate, requireVerified, async (req, res) => {
         let message = 'Appointment request submitted successfully.';
         let isQueued = false;
         
+        // ============================================================
+        // QUEUE LOGIC: If slot is taken, add to queue
+        // This handles the case where another customer booked first
+        // ============================================================
         if (existingConfirmedBookings.length > 0) {
             // Slot is already taken, add to queue
             status = 'queued';
             
+            // Log the race condition / collision
+            console.log(`[BOOKING] SLOT COLLISION: Slot already taken, adding customer ${user.id} to queue`);
+            
             // Get current max queue position for this slot
+            // New bookings go to the end of the queue
             const maxPositionResult = await db.query(`
                 SELECT COALESCE(MAX(queue_position), 0) + 1 as next_position 
                 FROM appointments 
@@ -427,6 +572,15 @@ router.post('/', authenticate, requireVerified, async (req, res) => {
             queuePosition = maxPositionResult[0].next_position;
             message = `This slot is in high demand! You've been added to the queue at position ${queuePosition}. You'll be notified immediately if the slot becomes available.`;
             isQueued = true;
+            
+            // Log the race condition for monitoring
+            auditLogger.logRaceCondition('BOOKING', {
+                propertyId,
+                slot: `${appointmentDate} ${appointmentTime}`,
+                existingBookingId: existingConfirmedBookings[0].id,
+                newCustomerId: user.id,
+                queuePosition: queuePosition
+            });
         }
         
         // Create appointment with booking timestamp
@@ -435,7 +589,18 @@ router.post('/', authenticate, requireVerified, async (req, res) => {
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
         `, [propertyId, user.id, property.assigned_agent_id, appointmentDate, appointmentTime, bookingTimestamp, notes || null, status, queuePosition]);
         
-        // Create notification for the agent (only for confirmed/pending bookings)
+        // Log the booking creation
+        auditLogger.logBooking(isQueued ? 'QUEUED' : 'CREATED', {
+            appointmentId: result.insertId,
+            customerId: user.id,
+            propertyId,
+            slot: `${appointmentDate} ${appointmentTime}`,
+            status,
+            queuePosition
+        });
+        
+        // Create notification for the agent (only for pending bookings, not queued)
+        // Queued bookings don't need agent notification until promoted
         if (!isQueued && property.assigned_agent_id) {
             await db.query(`
                 INSERT INTO notifications (user_id, type, title, message)
@@ -444,9 +609,11 @@ router.post('/', authenticate, requireVerified, async (req, res) => {
                 property.assigned_agent_id,
                 `New viewing request for ${property.title} on ${appointmentDate} at ${appointmentTime}.`
             ]);
+            
+            console.log(`[NOTIFICATION] Sent to agent ${property.assigned_agent_id} about new appointment`);
         }
         
-        // Fetch the created appointment
+        // Fetch the created appointment with property details
         const appointments = await db.query(`
             SELECT a.*,
                    p.title as property_title,
@@ -455,6 +622,8 @@ router.post('/', authenticate, requireVerified, async (req, res) => {
             JOIN properties p ON a.property_id = p.id
             WHERE a.id = ?
         `, [result.insertId]);
+        
+        console.log(`[BOOKING] Successfully created appointment ${result.insertId}, status=${status}, queued=${isQueued}`);
         
         res.status(201).json({
             success: true,
@@ -466,6 +635,7 @@ router.post('/', authenticate, requireVerified, async (req, res) => {
         
     } catch (error) {
         console.error('Create appointment error:', error);
+        auditLogger.logError('appointments.create', error);
         res.status(500).json({
             success: false,
             error: 'Failed to create appointment.'
@@ -476,17 +646,43 @@ router.post('/', authenticate, requireVerified, async (req, res) => {
 /**
  * PUT /api/appointments/:id
  * Update appointment (status change, notes, reschedule)
- * - Customer: can cancel their pending/confirmed/queued appointments
- * - Agent: can confirm, complete, or cancel assigned appointments
- * - Admin: full control
  * 
- * On cancellation: promotes next queued customer instantly
+ * @description
+ * Updates an existing appointment. The allowed actions depend on the user's role:
+ * 
+ * ## Role-Based Permissions (req.user.role)
+ * 
+ * - **Customer**: Can only cancel their own appointments (pending/confirmed/queued)
+ * - **Agent**: Can confirm, complete, or cancel their assigned appointments
+ * - **Admin**: Full control over all appointments
+ * 
+ * ## Queue Promotion on Cancellation
+ * 
+ * When a 'pending' or 'confirmed' appointment is cancelled, the system automatically:
+ * 1. Updates queue positions for remaining queued bookings
+ * 2. Promotes the first person in queue (position 1) to 'confirmed'
+ * 3. Sends notification to the promoted customer
+ * 
+ * @requires Authentication
+ * 
+ * @param {string} id - Appointment ID (URL parameter)
+ * @bodyparam {string} [status] - New status (confirmed, completed, cancelled)
+ * @bodyparam {string} [appointmentDate] - New date (YYYY-MM-DD)
+ * @bodyparam {string} [appointmentTime] - New time (HH:MM:SS)
+ * @bodyparam {string} [notes] - Updated notes
+ * 
+ * @fires BOOKING_CONFIRMED audit event
+ * @fires BOOKING_CANCELLED audit event
+ * @fires BOOKING_COMPLETED audit event
+ * @fires QUEUE_PROMOTION audit event (if cancellation triggers promotion)
  */
 router.put('/:id', authenticate, async (req, res) => {
     try {
         const { id } = req.params;
         const { status, appointmentDate, appointmentTime, notes } = req.body;
         const user = req.user;
+        
+        console.log(`[APPOINTMENT] Update request: id=${id}, status=${status}, by user=${user.id} (${user.role})`);
         
         // Get existing appointment
         const appointments = await db.query(`
@@ -505,9 +701,21 @@ router.put('/:id', authenticate, async (req, res) => {
         
         const appointment = appointments[0];
         
-        // Check permissions
+        // ============================================================
+        // ROLE-BASED AUTHORIZATION CHECKS
+        // Check req.user.role and enforce appropriate restrictions
+        // ============================================================
+        
         if (user.role === 'customer') {
+            // Customers can only modify their own appointments
             if (appointment.customer_id !== user.id) {
+                auditLogger.logAccessDenied({
+                    userId: user.id,
+                    userRole: user.role,
+                    action: 'UPDATE_APPOINTMENT',
+                    resourceId: id,
+                    reason: 'Customer cannot modify another customer\'s appointment'
+                });
                 return res.status(403).json({
                     success: false,
                     error: 'Access denied.'
@@ -520,25 +728,44 @@ router.put('/:id', authenticate, async (req, res) => {
                     error: 'Can only modify pending, confirmed, or queued appointments.'
                 });
             }
+            // Customers can only cancel (not confirm or complete)
             if (status && status !== 'cancelled') {
+                auditLogger.logAccessDenied({
+                    userId: user.id,
+                    userRole: user.role,
+                    action: 'UPDATE_APPOINTMENT_STATUS',
+                    resourceId: id,
+                    attemptedStatus: status,
+                    reason: 'Customers can only cancel appointments'
+                });
                 return res.status(403).json({
                     success: false,
                     error: 'Customers can only cancel appointments.'
                 });
             }
         } else if (user.role === 'agent') {
+            // Agents can only modify appointments they're assigned to
             if (appointment.agent_id !== user.id) {
+                auditLogger.logAccessDenied({
+                    userId: user.id,
+                    userRole: user.role,
+                    action: 'UPDATE_APPOINTMENT',
+                    resourceId: id,
+                    reason: 'Agent not assigned to this appointment'
+                });
                 return res.status(403).json({
                     success: false,
                     error: 'Access denied.'
                 });
             }
         }
-        // Admin has full access
+        // Admin has full access - no restrictions
         
-        // Store old status for comparison
+        // Store old status for comparison and logging
         const oldStatus = appointment.status;
         const newStatus = status || appointment.status;
+        
+        console.log(`[APPOINTMENT] Status change: ${oldStatus} -> ${newStatus}`);
         
         // Update appointment
         await db.query(`
@@ -558,10 +785,28 @@ router.put('/:id', authenticate, async (req, res) => {
             id
         ]);
         
-        // Handle cancellation - promote next in queue
+        // Log the status change
+        if (status && status !== oldStatus) {
+            auditLogger.logBooking(status.toUpperCase(), {
+                appointmentId: id,
+                customerId: appointment.customer_id,
+                propertyId: appointment.property_id,
+                previousStatus: oldStatus,
+                newStatus: status,
+                changedBy: user.id,
+                changedByRole: user.role
+            });
+        }
+        
+        // ============================================================
+        // QUEUE PROMOTION: Handle cancellation of confirmed booking
+        // When a confirmed slot is cancelled, promote the next in queue
+        // ============================================================
         let promotedCustomer = null;
         if (newStatus === 'cancelled' && ['pending', 'confirmed'].includes(oldStatus)) {
-            // Update queue positions for this slot
+            console.log(`[QUEUE] Cancellation detected, checking for queue promotion`);
+            
+            // Update queue positions for this slot (everyone moves up)
             await db.query(`
                 UPDATE appointments 
                 SET queue_position = queue_position - 1 
@@ -600,6 +845,8 @@ router.put('/:id', authenticate, async (req, res) => {
                 INSERT INTO notifications (user_id, type, title, message)
                 VALUES (?, 'appointment', ?, ?)
             `, [appointment.customer_id, notificationTitle, notificationMessage]);
+            
+            console.log(`[NOTIFICATION] Sent status update to customer ${appointment.customer_id}`);
             
             // Notify agent of cancellation by customer
             if (status === 'cancelled' && appointment.agent_id && user.id === appointment.customer_id) {

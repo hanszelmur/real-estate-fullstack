@@ -5,7 +5,11 @@
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
-    "dev": "node server.js"
+    "dev": "node server.js",
+    "test": "node tests/roles.test.js && node tests/queue.test.js && node tests/bookings.test.js",
+    "test:roles": "node tests/roles.test.js",
+    "test:queue": "node tests/queue.test.js",
+    "test:bookings": "node tests/bookings.test.js"
   },
   "keywords": ["real-estate", "api", "express", "mysql"],
   "author": "",
