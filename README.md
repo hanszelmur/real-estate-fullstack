@@ -30,6 +30,8 @@
 - [Fullstack vs Frontend-Only Comparison](#-fullstack-vs-frontend-only-comparison)
 - [Troubleshooting](#-troubleshooting)
 - [User Experience Critique](#-user-experience-critique)
+- [Critical Feature Gap: Property Lifecycle](#️-critical-feature-gap-property-lifecycle--transaction-workflow)
+- [Comprehensive Missing Features List](#-comprehensive-missing-features-list)
 - [Roadmap & TODO](#-roadmap--todo)
 - [Security Notes](#-security-notes)
 - [License](#-license)
@@ -1341,18 +1343,309 @@ PORT=4000 npm start
 
 ---
 
+## 🏷️ Critical Feature Gap: Property Lifecycle & Transaction Workflow
+
+### Overview
+
+The current application has significant gaps in the **complete property lifecycle** management. While the database schema includes a `status` field with values `available`, `pending`, `sold`, and `rented`, the **UI/UX for managing these statuses is incomplete**. This section documents the missing features and provides detailed recommendations for implementation.
+
+### Current State Analysis
+
+#### What EXISTS in the Database
+```sql
+status ENUM('available', 'pending', 'sold', 'rented') DEFAULT 'available'
+```
+
+The schema supports four property statuses, but the application lacks proper workflow for transitioning between them.
+
+#### What is MISSING
+
+| Gap | Impact | Priority |
+|-----|--------|----------|
+| **No "Mark as Sold" button** | Agents cannot record sales from the UI | 🔴 Critical |
+| **No "Mark as Rented" button** | Rental transactions cannot be recorded | 🔴 Critical |
+| **No status transition workflow** | Manual database updates required | 🔴 Critical |
+| **Sold properties hidden from customers** | No visibility into recently sold (for market research) | 🟡 Medium |
+| **No sold date tracking** | Cannot report on sales velocity | 🟡 Medium |
+| **No sale price vs listing price** | Cannot track negotiation outcomes | 🟡 Medium |
+| **No buyer/renter association** | Cannot link transactions to customers | 🟡 Medium |
+| **No transaction history** | No audit trail of status changes | 🟡 Medium |
+
+### 📋 Detailed "Mark as Sold" Feature Requirements
+
+#### 1. Agent/Admin Workflow
+
+**Expected Behavior:**
+- Agents should be able to mark their assigned properties as "Sold" or "Rented"
+- Admins should be able to mark any property as "Sold" or "Rented"
+- A confirmation dialog should appear before finalizing the status change
+- The system should optionally prompt for sale details (final price, buyer info, closing date)
+
+**Recommended UI/UX:**
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│ Property: 123 Main Street                         Status: Available │
+├─────────────────────────────────────────────────────────────────────┤
+│ [Edit Property] [Upload Photos] [Mark as Sold ▼]                    │
+│                                  ├──────────────┤                   │
+│                                  │ Mark as Sold │                   │
+│                                  │ Mark as Rented│                  │
+│                                  │ Mark as Pending│                 │
+│                                  └──────────────┘                   │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+**Confirmation Modal:**
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│                    Mark Property as Sold                            │
+├─────────────────────────────────────────────────────────────────────┤
+│ Property: 123 Main Street                                           │
+│ Listed Price: $450,000                                              │
+│                                                                     │
+│ Final Sale Price: [___________] (optional)                          │
+│ Closing Date: [___________] (optional)                              │
+│ Notes: [_________________________________] (optional)               │
+│                                                                     │
+│ ⚠️ This action will:                                                │
+│   • Remove the property from active listings                        │
+│   • Cancel all pending/queued appointments                          │
+│   • Notify waitlisted customers                                     │
+│                                                                     │
+│              [Cancel]                    [Confirm Sale]             │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+#### 2. Customer View - Sold Properties
+
+**Expected Behavior:**
+- Sold properties should remain visible with a clear "SOLD" badge/label
+- Customers should be able to filter to see recently sold properties (market research)
+- Sold properties should NOT appear in default "active" property searches
+- Property detail pages should show "This property has been sold" message
+- Booking buttons should be disabled with explanation
+
+**Recommended UI:**
+
+```
+┌────────────────────────────────────────┐
+│ ┌──────────────────────────────────┐   │
+│ │  [Property Image]         SOLD   │   │ ← Red "SOLD" banner
+│ │                          banner  │   │
+│ └──────────────────────────────────┘   │
+│ 123 Main Street                        │
+│ $450,000 (Sold: $445,000)              │ ← Show final price if available
+│ 3 bed | 2 bath | 1,500 sqft            │
+│                                        │
+│ [View Details] (booking disabled)      │
+└────────────────────────────────────────┘
+```
+
+#### 3. Staff/Admin View - Archive & Reporting
+
+**Expected Behavior:**
+- Admins should have a dedicated "Sold Properties" or "Archive" view
+- Should be able to filter by date range, agent, price range
+- Export functionality for reporting (CSV/PDF)
+- Sales metrics: total sales, average days on market, sale-to-list ratio
+
+**Recommended Dashboard Metrics:**
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│                      Sales Performance Dashboard                     │
+├─────────────────┬─────────────────┬─────────────────┬───────────────┤
+│  Properties     │  Total Sales    │  Avg Days on    │ Sale-to-List  │
+│  Sold (30d)     │  Value (30d)    │  Market         │ Ratio         │
+│      12         │   $4.2M         │     28 days     │    97.3%      │
+└─────────────────┴─────────────────┴─────────────────┴───────────────┘
+```
+
+### 🔧 Implementation Recommendations
+
+#### Database Changes
+
+```sql
+-- Add transaction tracking fields to properties table
+ALTER TABLE properties ADD COLUMN sold_date DATE DEFAULT NULL;
+ALTER TABLE properties ADD COLUMN sold_price DECIMAL(15, 2) DEFAULT NULL;
+ALTER TABLE properties ADD COLUMN sold_notes TEXT;
+
+-- Create a property status history table for audit trail
+CREATE TABLE property_status_history (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    property_id INT NOT NULL,
+    old_status ENUM('available', 'pending', 'sold', 'rented') NOT NULL,
+    new_status ENUM('available', 'pending', 'sold', 'rented') NOT NULL,
+    changed_by INT NOT NULL,
+    change_reason TEXT,
+    sold_price DECIMAL(15, 2) DEFAULT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (property_id) REFERENCES properties(id) ON DELETE CASCADE,
+    FOREIGN KEY (changed_by) REFERENCES users(id) ON DELETE SET NULL
+);
+```
+
+#### API Endpoints to Add
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `PUT` | `/api/properties/:id/status` | Change property status with validation |
+| `GET` | `/api/properties/sold` | Get sold properties for reporting |
+| `GET` | `/api/properties/:id/history` | Get status change history |
+
+**Example API Request:**
+```javascript
+PUT /api/properties/123/status
+{
+    "status": "sold",
+    "soldPrice": 445000,
+    "soldDate": "2024-01-15",
+    "notes": "Sold to first-time homebuyer, closed early"
+}
+```
+
+#### Frontend Changes Required
+
+| Portal | Changes Needed |
+|--------|----------------|
+| **Agent Portal** | Add "Change Status" dropdown/modal on property cards and edit page |
+| **Admin Portal** | Add status management, sold properties archive view, sales reports |
+| **Customer Portal** | Add "Recently Sold" filter, "SOLD" badges, disable booking on sold properties |
+
+#### Business Logic to Implement
+
+1. **Auto-cancel appointments**: When property marked as sold, cancel all pending/confirmed/queued appointments
+2. **Notify customers**: Send notification to customers with cancelled appointments
+3. **Notify waitlist**: Inform waitlisted customers the property is no longer available
+4. **Prevent booking**: Block new appointment creation for non-available properties
+5. **Agent restrictions**: Agents can only change status of their assigned properties
+
+### 🎯 Acceptance Criteria for "Mark as Sold" Feature
+
+- [ ] Agents can mark assigned properties as sold/rented via UI
+- [ ] Admins can mark any property as sold/rented via UI
+- [ ] Confirmation modal shows impact (cancelled appointments, notifications)
+- [ ] Sale details (price, date, notes) can optionally be recorded
+- [ ] Status change is logged in history table
+- [ ] All pending appointments are auto-cancelled with notifications
+- [ ] Waitlisted customers receive notification
+- [ ] Sold properties display "SOLD" badge in customer view
+- [ ] Customers can optionally filter to see sold properties
+- [ ] Sold properties excluded from default active search
+- [ ] Admin can view sold properties archive with filters
+- [ ] Sales metrics displayed on admin dashboard
+
+---
+
+## 🔴 Comprehensive Missing Features List
+
+This section enumerates **all known missing or incomplete features** required for a production-ready real estate platform.
+
+### Property Management Gaps
+
+| Feature | Current State | Required For Production |
+|---------|---------------|-------------------------|
+| **Mark as Sold workflow** | Database only, no UI | ✅ Essential |
+| **Mark as Rented workflow** | Database only, no UI | ✅ Essential |
+| **Property status history** | Not tracked | ✅ Essential |
+| **Sale price tracking** | Not captured | ✅ Essential |
+| **Days on market metric** | Not calculated | 🟡 Recommended |
+| **Property archival** | No dedicated view | 🟡 Recommended |
+| **Bulk status updates** | Not available | 🟡 Recommended |
+| **Property duplication** | Not available | ⚪ Nice to have |
+
+### Appointment/Booking Gaps
+
+| Feature | Current State | Required For Production |
+|---------|---------------|-------------------------|
+| **Auto-cancel on property sold** | Not implemented | ✅ Essential |
+| **Calendar view** | List view only | 🟡 Recommended |
+| **Recurring availability** | Not supported | 🟡 Recommended |
+| **Appointment reminders** | Not implemented | ✅ Essential |
+| **No-show tracking** | Not tracked | 🟡 Recommended |
+| **Rescheduling flow** | Must cancel & rebook | 🟡 Recommended |
+
+### User Management Gaps
+
+| Feature | Current State | Required For Production |
+|---------|---------------|-------------------------|
+| **Password reset** | Not available | ✅ Essential |
+| **Email verification** | Console-based SMS only | ✅ Essential |
+| **Agent profiles** | Basic info only | 🟡 Recommended |
+| **Customer profiles** | Basic info only | 🟡 Recommended |
+| **Account deletion** | Admin only | 🟡 Recommended |
+| **Multi-factor authentication** | Not available | 🟡 Recommended |
+
+### Communication Gaps
+
+| Feature | Current State | Required For Production |
+|---------|---------------|-------------------------|
+| **Email notifications** | Console-based only | ✅ Essential |
+| **SMS notifications** | Console-based only | ✅ Essential |
+| **In-app messaging** | Not available | 🟡 Recommended |
+| **Agent-customer chat** | Not available | 🟡 Recommended |
+| **Push notifications** | Not available | 🟡 Recommended |
+
+### Reporting & Analytics Gaps
+
+| Feature | Current State | Required For Production |
+|---------|---------------|-------------------------|
+| **Sales reports** | Not available | ✅ Essential |
+| **Agent performance metrics** | Basic rating only | 🟡 Recommended |
+| **Property view tracking** | Not tracked | 🟡 Recommended |
+| **Search analytics** | Not tracked | ⚪ Nice to have |
+| **Export to CSV/PDF** | Not available | 🟡 Recommended |
+| **Dashboard charts** | Not available | 🟡 Recommended |
+
+### Search & Discovery Gaps
+
+| Feature | Current State | Required For Production |
+|---------|---------------|-------------------------|
+| **Map view** | Not available | 🟡 Recommended |
+| **Saved searches** | Not available | 🟡 Recommended |
+| **Favorites/wishlist** | Not available | 🟡 Recommended |
+| **Property comparison** | Not available | 🟡 Recommended |
+| **Advanced filters** | Basic only | 🟡 Recommended |
+| **Neighborhood info** | Not available | ⚪ Nice to have |
+
+### Technical Debt
+
+| Issue | Current State | Required For Production |
+|-------|---------------|-------------------------|
+| **JWT authentication** | Base64 tokens | ✅ Essential (Security) |
+| **HTTPS** | Not enforced | ✅ Essential (Security) |
+| **Rate limiting** | Not implemented | ✅ Essential (Security) |
+| **Input validation** | Basic | 🟡 Recommended |
+| **Error logging** | Console only | 🟡 Recommended |
+| **Database migrations** | Raw SQL files | 🟡 Recommended |
+| **Test coverage** | Minimal | 🟡 Recommended |
+| **CI/CD pipeline** | Not configured | 🟡 Recommended |
+
+---
+
 ## 🗺 Roadmap & TODO
 
 ### Missing Features (Common in Production Real Estate Apps)
 
+#### 🔴 Critical Priority (Blocking Real-World Use)
+- [ ] **Mark as Sold/Rented Workflow** - UI for agents/admins to mark properties as sold or rented (see detailed spec above)
+- [ ] **Property Status Change History** - Audit trail of all status transitions
+- [ ] **Auto-Cancel Appointments on Sale** - When property sold, cancel pending appointments and notify customers
+- [ ] **Password Reset Flow** - Self-service password recovery for locked-out users
+- [ ] **Real Email/SMS Notifications** - Replace console-based verification with actual delivery
+
 #### High Priority
 - [x] **Document Upload System** - Property photos, floor plans (✅ Implemented)
 - [ ] **Admin Analytics Dashboard** - Charts for bookings over time, agent performance, property trends
+- [ ] **Sales Reporting Dashboard** - Track sold properties, sale prices, days on market, agent performance
+- [ ] **Sold Properties Archive View** - Admin view for historical sales with filtering and export
 - [ ] **Saved/Favorited Properties** - Customers can save properties for later
 - [ ] **Search History** - Track recent searches per user
-- [ ] **Email Notifications** - Replace console SMS with real email (SendGrid, SES)
+- [ ] **Appointment Reminders** - Email/SMS reminders before scheduled viewings
 
 #### Medium Priority
+- [ ] **"Recently Sold" Customer View** - Let customers see sold properties for market research
 - [ ] **Map Integration** - Google Maps/Mapbox for property locations
 - [ ] **Push Notifications** - Browser/mobile push for instant alerts
 - [ ] **Mortgage Calculator** - Estimate monthly payments
@@ -1360,6 +1653,7 @@ PORT=4000 npm start
 - [ ] **Compliance Document Upload** - Agent license verification
 - [ ] **Rich Agent Profiles** - Bio, certifications, specialties
 - [ ] **Property Comparison** - Side-by-side compare 2-3 properties
+- [ ] **Calendar View for Appointments** - Weekly/monthly calendar instead of list only
 
 #### Lower Priority
 - [ ] **Advanced Search Filters** - School district, amenities, HOA
