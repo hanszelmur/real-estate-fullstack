@@ -11,19 +11,26 @@
 
 /**
  * Escape HTML special characters to prevent XSS attacks
+ * Uses direct string replacement for better performance and security.
  * 
  * @param {string} str - String to escape
  * @returns {string} Escaped string safe for HTML insertion
  * 
  * @example
  * const safeText = escapeHtml('<script>alert("xss")</script>');
- * // Returns: '&lt;script&gt;alert("xss")&lt;/script&gt;'
+ * // Returns: '&lt;script&gt;alert(&quot;xss&quot;)&lt;/script&gt;'
  */
 function escapeHtml(str) {
     if (!str) return '';
-    const div = document.createElement('div');
-    div.textContent = str;
-    return div.innerHTML;
+    // Convert to string if not already
+    const text = String(str);
+    // Replace HTML special characters with their entity equivalents
+    return text
+        .replace(/&/g, '&amp;')   // Must be first to avoid double-encoding
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
 }
 
 /**

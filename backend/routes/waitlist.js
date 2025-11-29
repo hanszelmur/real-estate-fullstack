@@ -1,12 +1,40 @@
 /**
  * Waitlist Routes
  * 
- * Handles property waitlist/queue management.
+ * @file waitlist.js
+ * @description Handles property waitlist/queue management.
+ *              Allows customers to express interest in properties that may not be available.
  * 
- * Endpoints:
- * - GET /api/waitlist - List customer's waitlist entries
- * - POST /api/waitlist - Join waitlist for a property
+ * @module routes/waitlist
+ * 
+ * ## Feature Overview
+ * 
+ * The waitlist system allows customers to:
+ * - Join a waitlist for properties they're interested in
+ * - Track their position in the queue
+ * - Leave the waitlist if no longer interested
+ * 
+ * Agents/admins can:
+ * - View waitlist entries for their properties
+ * - Contact customers when properties become available
+ * 
+ * ## Position Management
+ * 
+ * When a customer joins: They get the next available position
+ * When a customer leaves: All positions after them are decremented
+ * 
+ * @example Flow:
+ * Customer A joins → Position 1
+ * Customer B joins → Position 2
+ * Customer A leaves → Customer B becomes Position 1
+ * 
+ * ## Endpoints
+ * 
+ * - GET /api/waitlist - List waitlist entries (filtered by role)
+ * - POST /api/waitlist - Join waitlist for a property (customer)
  * - DELETE /api/waitlist/:id - Leave waitlist
+ * 
+ * @see backend/routes/todo/favorites.js for saved/favorited properties feature
  */
 
 const express = require('express');

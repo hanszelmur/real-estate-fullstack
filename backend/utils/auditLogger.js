@@ -260,12 +260,22 @@ function logAccessDenied(details) {
 /**
  * Log an authentication event
  * 
- * @param {string} action - Auth action (login, logout, register, etc.)
+ * @param {string} action - Auth action ('LOGIN', 'LOGOUT', 'REGISTER', 'VERIFY')
  * @param {Object} details - Event details
  * @param {boolean} success - Whether the action was successful
+ * 
+ * @example
+ * logAuth('LOGIN', { userId: 1, email: 'user@example.com' }, true);
+ * logAuth('LOGIN', { email: 'user@example.com', reason: 'Invalid password' }, false);
  */
 function logAuth(action, details, success = true) {
-    const eventType = success ? `AUTH_${action.toUpperCase()}` : EVENT_TYPES.AUTH_FAILED;
+    // Map action to valid EVENT_TYPE constant
+    // This ensures we use defined event types instead of arbitrary strings
+    const actionUpper = action.toUpperCase();
+    const eventTypeKey = `AUTH_${actionUpper}`;
+    const eventType = success 
+        ? (EVENT_TYPES[eventTypeKey] || eventTypeKey)  // Use defined type if exists
+        : EVENT_TYPES.AUTH_FAILED;
     const level = success ? LOG_LEVELS.INFO : LOG_LEVELS.WARN;
     log(eventType, { ...details, success }, level);
 }
@@ -273,11 +283,17 @@ function logAuth(action, details, success = true) {
 /**
  * Log a booking event
  * 
- * @param {string} action - Booking action (created, confirmed, cancelled, etc.)
+ * @param {string} action - Booking action ('CREATED', 'CONFIRMED', 'CANCELLED', 'COMPLETED', 'QUEUED', 'PROMOTED')
  * @param {Object} details - Booking details
+ * 
+ * @example
+ * logBooking('CREATED', { appointmentId: 1, customerId: 2, propertyId: 3 });
  */
 function logBooking(action, details) {
-    const eventType = `BOOKING_${action.toUpperCase()}`;
+    // Map action to valid EVENT_TYPE constant
+    const actionUpper = action.toUpperCase();
+    const eventTypeKey = `BOOKING_${actionUpper}`;
+    const eventType = EVENT_TYPES[eventTypeKey] || eventTypeKey;
     log(eventType, details, LOG_LEVELS.INFO);
 }
 

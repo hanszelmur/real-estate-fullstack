@@ -526,10 +526,15 @@ router.post('/', authenticate, requireVerified, async (req, res) => {
         // RACE CONDITION HANDLING: Record precise booking timestamp
         // Using DATETIME(6) for microsecond precision ensures accurate
         // ordering even for near-simultaneous booking requests
+        // MySQL DATETIME(6) format: 'YYYY-MM-DD HH:MM:SS.ffffff'
         // ============================================================
         const now = new Date();
-        const bookingTimestamp = now.toISOString().slice(0, 23).replace('T', ' ') + 
-            String(now.getMilliseconds()).padStart(3, '0').substring(0, 3);
+        // Format timestamp for MySQL DATETIME(6): 'YYYY-MM-DD HH:MM:SS.mmm000'
+        // JavaScript provides millisecond precision (3 digits), MySQL allows microseconds (6 digits)
+        const isoString = now.toISOString(); // 2024-01-15T10:30:45.123Z
+        const datePart = isoString.slice(0, 10); // 2024-01-15
+        const timePart = isoString.slice(11, 23); // 10:30:45.123
+        const bookingTimestamp = `${datePart} ${timePart}000`; // Add microseconds (000)
         
         console.log(`[BOOKING] Booking timestamp: ${bookingTimestamp}`);
         
@@ -574,10 +579,12 @@ router.post('/', authenticate, requireVerified, async (req, res) => {
             isQueued = true;
             
             // Log the race condition for monitoring
+            // Safe access with optional chaining to prevent runtime errors
+            const existingBooking = existingConfirmedBookings[0];
             auditLogger.logRaceCondition('BOOKING', {
                 propertyId,
                 slot: `${appointmentDate} ${appointmentTime}`,
-                existingBookingId: existingConfirmedBookings[0].id,
+                existingBookingId: existingBooking?.id || null,
                 newCustomerId: user.id,
                 queuePosition: queuePosition
             });

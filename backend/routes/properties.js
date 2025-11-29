@@ -1,21 +1,40 @@
 /**
  * Property Routes
  * 
- * Handles property listing management - CRUD operations for real estate properties.
+ * @file properties.js
+ * @description Handles property listing management - CRUD operations for real estate properties.
+ *              Includes role-based access control for creating, updating, and deleting properties.
  * 
- * Endpoints:
+ * @module routes/properties
+ * 
+ * ## Role-Based Access Control
+ * 
+ * | Action | Roles Allowed | Notes |
+ * |--------|---------------|-------|
+ * | List/View | Public | Available properties only for non-admin |
+ * | Create | Admin, Agent | Agents auto-assigned to their properties |
+ * | Update | Admin, Agent | Agents can only update assigned properties |
+ * | Delete | Admin only | Hard delete with cascade |
+ * | Set Featured | Admin only | Featured flag for homepage display |
+ * | Assign Agent | Admin only | Agents cannot reassign properties |
+ * 
+ * ## Endpoints
+ * 
  * - GET /api/properties - List all available properties (public)
  * - GET /api/properties/:id - Get single property details (public)
+ * - GET /api/properties/featured - Get featured properties (public)
  * - POST /api/properties - Create new property (admin/agent)
  * - PUT /api/properties/:id - Update property (admin/agent)
  * - DELETE /api/properties/:id - Delete property (admin only)
- * - GET /api/properties/featured - Get featured properties (public)
+ * 
+ * @see backend/sql/schema.sql for properties table structure
  */
 
 const express = require('express');
 const router = express.Router();
 const db = require('../config/database');
 const { authenticate, requireRole, optionalAuth } = require('../middleware/auth');
+const auditLogger = require('../utils/auditLogger');
 
 /**
  * GET /api/properties
@@ -226,8 +245,36 @@ router.get('/:id', optionalAuth, async (req, res) => {
 
 /**
  * POST /api/properties
- * Create new property
- * Admin or Agent only
+ * Create new property listing
+ * 
+ * @description Creates a new property listing. Agents can create properties
+ *              that are automatically assigned to themselves. Admins can
+ *              assign properties to any agent and set featured status.
+ * 
+ * @requires Authentication (Admin or Agent role)
+ * 
+ * @bodyparam {string} title - Property title (required)
+ * @bodyparam {string} [description] - Detailed description
+ * @bodyparam {string} address - Street address (required)
+ * @bodyparam {string} city - City (required)
+ * @bodyparam {string} state - State abbreviation (required)
+ * @bodyparam {string} zipCode - ZIP code (required)
+ * @bodyparam {number} price - Listing price (required)
+ * @bodyparam {string} propertyType - Type: house, apartment, condo, land, commercial (required)
+ * @bodyparam {string} listingType - Type: sale, rent (required)
+ * @bodyparam {number} [bedrooms] - Number of bedrooms
+ * @bodyparam {number} [bathrooms] - Number of bathrooms
+ * @bodyparam {number} [squareFeet] - Square footage
+ * @bodyparam {number} [lotSize] - Lot size in acres
+ * @bodyparam {number} [yearBuilt] - Year constructed
+ * @bodyparam {string} [status] - Status: available, pending, sold, rented
+ * @bodyparam {boolean} [featured] - Featured on homepage (admin only)
+ * @bodyparam {string} [imageUrl] - URL to property image
+ * @bodyparam {number} [assignedAgentId] - Agent to assign (admin only)
+ * 
+ * @returns {Object} Created property object
+ * 
+ * @fires PROPERTY_CREATED audit event
  */
 router.post('/', authenticate, requireRole('admin', 'agent'), async (req, res) => {
     try {
@@ -260,13 +307,22 @@ router.post('/', authenticate, requireRole('admin', 'agent'), async (req, res) =
             });
         }
         
+        // ============================================================
+        // ROLE-BASED RESTRICTIONS
+        // - Only admins can set featured status (highlights on homepage)
+        // - Agents auto-assign properties to themselves
+        // ============================================================
+        
         // Only admins can set featured status
         const isFeatured = req.user.role === 'admin' ? (featured || false) : false;
         
         // If agent is creating, assign to themselves by default
+        // Admins can assign to any agent or leave unassigned
         const agentId = req.user.role === 'admin' 
             ? (assignedAgentId || null) 
             : req.user.id;
+        
+        console.log(`[PROPERTY] Creating property: ${title} by ${req.user.role} ${req.user.id}`);
         
         const result = await db.query(`
             INSERT INTO properties (

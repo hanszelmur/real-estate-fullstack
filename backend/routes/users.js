@@ -1,13 +1,30 @@
 /**
  * User Management Routes (Admin Only)
  * 
- * Handles user administration for admin dashboard.
+ * @file users.js
+ * @description Handles user administration for admin dashboard.
+ *              All routes require admin role authentication.
  * 
- * Endpoints:
+ * @module routes/users
+ * 
+ * ## Role-Based Access
+ * 
+ * All routes in this file are protected by `requireRole('admin')` middleware.
+ * Only admin users can:
+ * - List all users
+ * - View user details with statistics
+ * - Update user profiles (including role changes)
+ * - Activate/deactivate accounts
+ * 
+ * ## Endpoints
+ * 
  * - GET /api/users - List all users (admin only)
  * - GET /api/users/:id - Get single user (admin only)
  * - PUT /api/users/:id - Update user (admin only)
- * - GET /api/users/agents - List all agents
+ * - GET /api/users/agents - List all agents (admin and agents)
+ * - GET /api/users/stats/overview - Get user statistics (admin only)
+ * 
+ * @see backend/middleware/auth.js for authentication middleware
  */
 
 const express = require('express');
@@ -15,6 +32,7 @@ const router = express.Router();
 const db = require('../config/database');
 const { hashPassword } = require('../utils/auth');
 const { authenticate, requireRole } = require('../middleware/auth');
+const auditLogger = require('../utils/auditLogger');
 
 /**
  * GET /api/users
@@ -187,13 +205,40 @@ router.get('/:id', authenticate, requireRole('admin'), async (req, res) => {
 
 /**
  * PUT /api/users/:id
- * Update user (activate/deactivate, change role, etc.)
- * Admin only
+ * Update user profile (activate/deactivate, change role, etc.)
+ * 
+ * @description Admin-only endpoint for managing user accounts.
+ *              Includes safety checks to prevent self-deactivation.
+ * 
+ * @requires Authentication (Admin role)
+ * 
+ * @param {string} id - User ID (URL parameter)
+ * @bodyparam {string} [firstName] - Updated first name
+ * @bodyparam {string} [lastName] - Updated last name
+ * @bodyparam {string} [phone] - Updated phone number
+ * @bodyparam {string} [role] - New role (customer, agent, admin)
+ * @bodyparam {boolean} [isActive] - Account activation status
+ * @bodyparam {boolean} [isVerified] - Verification status
+ * @bodyparam {string} [password] - New password (will be hashed)
+ * 
+ * @returns {Object} Updated user object
+ * 
+ * @example Request body:
+ * {
+ *   "role": "agent",
+ *   "isActive": true
+ * }
+ * 
+ * @fires USER_UPDATED audit event
+ * @fires USER_ROLE_CHANGED audit event (if role changed)
+ * @fires USER_DEACTIVATED audit event (if deactivated)
  */
 router.put('/:id', authenticate, requireRole('admin'), async (req, res) => {
     try {
         const { id } = req.params;
         const { firstName, lastName, phone, role, isActive, isVerified, password } = req.body;
+        
+        console.log(`[USER] Admin ${req.user.id} updating user ${id}`);
         
         // Check if user exists
         const users = await db.query('SELECT * FROM users WHERE id = ?', [id]);
@@ -207,15 +252,27 @@ router.put('/:id', authenticate, requireRole('admin'), async (req, res) => {
         
         const user = users[0];
         
-        // Prevent admin from deactivating themselves
-        if (parseInt(id) === req.user.id && isActive === false) {
+        // ============================================================
+        // SAFETY CHECK: Prevent admin from deactivating themselves
+        // This prevents accidental lockout from the system
+        // Convert both to Number explicitly for strict comparison
+        // ============================================================
+        const targetUserId = Number(id);
+        const currentUserId = Number(req.user.id);
+        
+        if (targetUserId === currentUserId && isActive === false) {
+            auditLogger.logAccessDenied({
+                userId: req.user.id,
+                action: 'SELF_DEACTIVATE',
+                reason: 'Admin cannot deactivate their own account'
+            });
             return res.status(400).json({
                 success: false,
                 error: 'Cannot deactivate your own account.'
             });
         }
         
-        // Build update query
+        // Build update query dynamically based on provided fields
         let updateFields = [];
         let params = [];
         
@@ -234,9 +291,19 @@ router.put('/:id', authenticate, requireRole('admin'), async (req, res) => {
             params.push(phone);
         }
         
+        // Log role changes for audit trail
         if (role !== undefined) {
             updateFields.push('role = ?');
             params.push(role);
+            
+            if (role !== user.role) {
+                auditLogger.log('USER_ROLE_CHANGED', {
+                    userId: id,
+                    oldRole: user.role,
+                    newRole: role,
+                    changedBy: req.user.id
+                });
+            }
         }
         
         if (isActive !== undefined) {

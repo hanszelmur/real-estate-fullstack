@@ -26,6 +26,8 @@ class MockBookingQueue {
     constructor() {
         // Structure: { 'propertyId:date:time': [appointments] }
         this.slots = {};
+        // Counter for generating unique timestamps in tests
+        this._timestampCounter = 0;
     }
     
     /**
@@ -64,7 +66,10 @@ class MockBookingQueue {
             this.slots[key] = [];
         }
         
-        const timestamp = Date.now() + Math.random(); // Simulate microsecond precision
+        // Use incremental counter for unique timestamps (more predictable than random)
+        // In production, MySQL DATETIME(6) provides microsecond precision
+        this._timestampCounter++;
+        const timestamp = Date.now() + this._timestampCounter;
         
         // Check if slot is already taken
         if (this.isSlotTaken(propertyId, date, time)) {
