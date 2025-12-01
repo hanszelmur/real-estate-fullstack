@@ -1477,7 +1477,7 @@ This section provides a critical analysis of the platform's design decisions, tr
 | **Pagination** | Basic offset | Cursor-based for large datasets |
 | **Caching** | None | Redis for session/property caching |
 | **Search** | Basic SQL LIKE | Elasticsearch for property search |
-| **Image Storage** | Local disk | S3/CloudFlare R2 with CDN |
+| **Image Storage** | Local disk | S3/Cloudflare R2 with CDN |
 
 ### Scalability Considerations
 
