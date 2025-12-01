@@ -15,8 +15,63 @@
 
 ---
 
+## 🆕 What's New (v1.1.0)
+
+### Property Lifecycle Management
+
+This release introduces complete property lifecycle management, enabling agents and admins to track properties from listing through sale/rental to archival.
+
+#### Key Features
+
+| Feature | Description | Portal |
+|---------|-------------|--------|
+| **Mark as Sold/Rented** | One-click status change with automatic appointment cancellation | Agent, Admin |
+| **Sales Tracking** | Track who closed each sale for commission purposes | Agent, Admin |
+| **My Sales Dashboard** | View your closed deals with stats (count, total value) | Agent |
+| **Sales Report** | Filter by agent, date range with CSV export | Admin |
+| **Archive System** | Archive sold/rented properties to clean up active listings | Agent, Admin |
+| **SOLD/RENTED Badges** | Visual indicators on property cards for sold/rented status | Customer |
+| **Unavailable Notice** | Clear messaging when properties are no longer available | Customer |
+
+#### Screenshots
+
+> **Note:** The screenshots below are placeholders. Capture actual screenshots by running the application and navigating to the respective pages.
+
+**Agent Portal - My Sales Tab:**
+
+<!-- Screenshot: screenshots/agent-sales.png - Navigate to Agent Portal > My Sales tab -->
+
+*View your closed deals with total count and value statistics.*
+
+**Admin Portal - Sales Report:**
+
+<!-- Screenshot: screenshots/admin-sales-report.png - Navigate to Admin Portal > Sales Report tab -->
+
+*Filter sales by agent and date range, export to CSV for commission calculations.*
+
+**Customer Portal - Sold Property:**
+
+<!-- Screenshot: screenshots/customer-sold-badge.png - View a sold property in Customer Portal -->
+
+*Properties display SOLD/RENTED overlay badges when no longer available.*
+
+#### Business Rules
+
+| Scenario | Behavior |
+|----------|----------|
+| Admin adds property via SQL | No assigned agent (NULL) |
+| Admin adds property via website | Can choose agent or leave empty |
+| Agent adds property via website | Auto-assigned to themselves |
+| Agent marks sold | `sold_by_agent_id` = agent's ID |
+| Admin marks sold | Can specify which agent gets credit |
+| Archive | Only sold/rented properties can be archived |
+| Unarchive | Admin only |
+
+---
+
 ## 📋 Table of Contents
 
+- [What's New (v1.1.0)](#-whats-new-v110)
 - [Overview](#overview)
 - [Features](#-features)
 - [System Architecture](#-system-architecture)
@@ -30,6 +85,7 @@
 - [Fullstack vs Frontend-Only Comparison](#-fullstack-vs-frontend-only-comparison)
 - [Troubleshooting](#-troubleshooting)
 - [User Experience Critique](#-user-experience-critique)
+- [Platform Critique](#-platform-critique)
 - [Roadmap & TODO](#-roadmap--todo)
 - [Security Notes](#-security-notes)
 - [License](#-license)
@@ -1386,6 +1442,77 @@ PORT=4000 npm start
 5. **Form Validation:** Real-time validation feedback as users type
 6. **Empty States:** Better messaging when lists are empty (e.g., "No appointments yet")
 7. **Session Timeout:** Warn users before token expiration, handle graceful re-login
+
+---
+
+## 🏗 Platform Critique
+
+This section provides a critical analysis of the platform's design decisions, tradeoffs, and areas for improvement from both technical and business perspectives.
+
+### Architectural Decisions
+
+| Decision | Rationale | Tradeoff |
+|----------|-----------|----------|
+| **Separate Portals** | Clear role separation, simpler per-role logic | Code duplication across frontends |
+| **MySQL over NoSQL** | Relational integrity for bookings/users | Less flexibility for schema changes |
+| **Token-based Auth** | Stateless, scalable | No centralized session invalidation |
+| **Console SMS Codes** | Demo-friendly, no external dependencies | Not production-ready |
+| **File Upload to Disk** | Simple, no cloud dependency | Not scalable, no CDN |
+
+### What Works Well
+
+1. **Role-Based Access Control** - Clean separation enforced at both middleware and route levels
+2. **Queue Management** - Microsecond precision handles concurrent bookings gracefully
+3. **Notification System** - Centralized notifications keep users informed
+4. **Sales Tracking** - Commission tracking with clear ownership (`sold_by_agent_id`)
+5. **Archive System** - Soft delete preserves data for reporting
+
+### Areas Needing Improvement
+
+| Area | Current State | Recommended Improvement |
+|------|---------------|------------------------|
+| **Authentication** | Base64 tokens | JWT with proper signing and expiry |
+| **API Versioning** | None | Prefix routes with `/api/v1/` |
+| **Error Responses** | Inconsistent | Standardize error format with codes |
+| **Pagination** | Basic offset | Cursor-based for large datasets |
+| **Caching** | None | Redis for session/property caching |
+| **Search** | Basic SQL LIKE | Elasticsearch for property search |
+| **Image Storage** | Local disk | S3/Cloudflare R2 with CDN |
+
+### Scalability Considerations
+
+**Current Limitations:**
+- Single MySQL instance becomes bottleneck at scale
+- No horizontal scaling for backend servers
+- File uploads stored locally (not distributed)
+- No connection pooling optimization
+
+**Recommended Path to Scale:**
+1. Add read replicas for MySQL
+2. Move to containerized deployment (Docker/K8s)
+3. Implement Redis for caching and sessions
+4. Use object storage (S3) for images with CDN
+5. Add API gateway for rate limiting and auth
+
+### Security Assessment
+
+| Aspect | Status | Notes |
+|--------|--------|-------|
+| SQL Injection | ✅ Protected | Parameterized queries throughout |
+| XSS | ✅ Protected | HTML escaping in frontend |
+| CSRF | ⚠️ Partial | Token-based but no CSRF tokens |
+| Auth Tokens | ⚠️ Basic | Base64 encoding, not cryptographic |
+| Password Storage | ✅ Good | bcrypt with salt |
+| Input Validation | ⚠️ Basic | Should use validation library |
+| Rate Limiting | ❌ Missing | Critical for production |
+
+### Business Logic Gaps
+
+1. **No Lease/Sale Agreements** - No document generation or e-signature
+2. **No Payment Integration** - No deposit/payment handling
+3. **No Lead Scoring** - All customers treated equally
+4. **No Marketing Automation** - No email campaigns or drip sequences
+5. **No Commission Calculation** - Only tracks who sold, not amounts owed
 
 ---
 
