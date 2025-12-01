@@ -138,6 +138,9 @@ function navigateTo(pageName) {
         case 'properties':
             loadProperties();
             break;
+        case 'sales':
+            loadMySales();
+            break;
         case 'appointments':
             loadAppointments();
             break;
@@ -350,10 +353,15 @@ async function loadProperties() {
             <div class="property-grid">
                 ${propertiesWithPhotos.map(property => {
                     const imageUrl = getPropertyImageUrl(property);
+                    const showSaleButtons = ['available', 'pending'].includes(property.status);
+                    const showArchiveButton = ['sold', 'rented'].includes(property.status) && !property.is_archived;
+                    const isForRent = property.listing_type === 'rent';
                     return `
                     <div class="property-card">
                         <div class="property-image">
                             ${imageUrl ? `<img src="${imageUrl}" alt="${escapeHtml(property.title)}">` : '🏠'}
+                            ${property.status === 'sold' ? '<span class="status-badge sold">SOLD</span>' : ''}
+                            ${property.status === 'rented' ? '<span class="status-badge rented">RENTED</span>' : ''}
                         </div>
                         <div class="property-info">
                             <h3 class="property-title">${escapeHtml(property.title)}</h3>
@@ -362,6 +370,14 @@ async function loadProperties() {
                             <span class="property-status ${property.status}">${capitalize(property.status)}</span>
                             <div class="property-card-actions">
                                 <button class="btn btn-secondary btn-sm" onclick="editProperty(${property.id})">Edit</button>
+                                ${showSaleButtons ? `
+                                    <button class="btn btn-success btn-sm" onclick="showMarkSoldModal(${property.id}, '${escapeHtml(property.title)}', '${isForRent ? 'rented' : 'sold'}')">
+                                        ${isForRent ? '🔑 Mark Rented' : '✓ Mark Sold'}
+                                    </button>
+                                ` : ''}
+                                ${showArchiveButton ? `
+                                    <button class="btn btn-secondary btn-sm" onclick="archiveProperty(${property.id})">📦 Archive</button>
+                                ` : ''}
                             </div>
                         </div>
                     </div>
@@ -790,6 +806,123 @@ function formatTime(timeStr) {
 
 function capitalize(str) {
     return str.charAt(0).toUpperCase() + str.slice(1);
+}
+
+// ============================================================================
+// SALES TRACKING FUNCTIONS
+// ============================================================================
+
+/**
+ * Load agent's sales (sold/rented properties)
+ */
+async function loadMySales() {
+    const container = document.getElementById('salesList');
+    container.innerHTML = '<div class="loading">Loading sales...</div>';
+    
+    const response = await API.get('/properties/sold');
+    
+    if (response.ok && response.data.success) {
+        const { properties, summary } = response.data;
+        
+        // Update summary stats
+        document.getElementById('totalSalesCount').textContent = summary.totalSales;
+        document.getElementById('totalSalesValue').textContent = '$' + formatPrice(summary.totalValue);
+        
+        if (properties.length === 0) {
+            container.innerHTML = `
+                <p class="text-center">No sales recorded yet.</p>
+                <p class="text-center text-muted">When you mark properties as sold or rented, they will appear here.</p>
+            `;
+            return;
+        }
+        
+        container.innerHTML = `
+            <div class="sales-table">
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>Property</th>
+                            <th>Address</th>
+                            <th>Price</th>
+                            <th>Status</th>
+                            <th>Sold Date</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${properties.map(p => `
+                            <tr>
+                                <td>${escapeHtml(p.title)}</td>
+                                <td>${escapeHtml(p.address)}, ${escapeHtml(p.city)}</td>
+                                <td>$${formatPrice(p.price)}</td>
+                                <td><span class="property-status ${p.status}">${capitalize(p.status)}</span></td>
+                                <td>${p.sold_date ? formatDate(p.sold_date) : '-'}</td>
+                            </tr>
+                        `).join('')}
+                    </tbody>
+                </table>
+            </div>
+        `;
+    } else {
+        container.innerHTML = '<p class="text-center">Failed to load sales data.</p>';
+    }
+}
+
+/**
+ * Show the mark as sold/rented confirmation modal
+ */
+function showMarkSoldModal(propertyId, propertyTitle, action) {
+    document.getElementById('markSoldPropertyId').value = propertyId;
+    document.getElementById('markSoldAction').value = action;
+    document.getElementById('markSoldPropertyName').textContent = propertyTitle;
+    document.getElementById('markSoldModalTitle').textContent = 
+        action === 'rented' ? 'Mark Property as Rented' : 'Mark Property as Sold';
+    openModal('markSoldModal');
+}
+
+/**
+ * Confirm and execute the mark sold/rented action
+ */
+async function confirmMarkSold() {
+    const propertyId = document.getElementById('markSoldPropertyId').value;
+    const action = document.getElementById('markSoldAction').value;
+    
+    const endpoint = action === 'rented' 
+        ? `/properties/${propertyId}/mark-rented`
+        : `/properties/${propertyId}/mark-sold`;
+    
+    const response = await API.put(endpoint, {});
+    
+    if (response.ok && response.data.success) {
+        closeModal('markSoldModal');
+        loadProperties();
+        
+        const cancelledCount = response.data.cancelledAppointments || 0;
+        let message = response.data.message || `Property marked as ${action} successfully.`;
+        if (cancelledCount > 0) {
+            message += ` ${cancelledCount} appointment(s) were cancelled and customers were notified.`;
+        }
+        alert(message);
+    } else {
+        alert(response.data.error || 'Failed to update property status.');
+    }
+}
+
+/**
+ * Archive a sold/rented property
+ */
+async function archiveProperty(propertyId) {
+    if (!confirm('Are you sure you want to archive this property? It will be hidden from active listings.')) {
+        return;
+    }
+    
+    const response = await API.put(`/properties/${propertyId}/archive`, {});
+    
+    if (response.ok && response.data.success) {
+        loadProperties();
+        alert('Property archived successfully.');
+    } else {
+        alert(response.data.error || 'Failed to archive property.');
+    }
 }
 
 // Close modal when clicking outside

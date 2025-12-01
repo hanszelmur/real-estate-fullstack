@@ -41,6 +41,8 @@
                 <a href="#" class="nav-item active" data-page="dashboard">📊 Dashboard</a>
                 <a href="#" class="nav-item" data-page="users">👥 Users</a>
                 <a href="#" class="nav-item" data-page="properties">🏠 Properties</a>
+                <a href="#" class="nav-item" data-page="sales">💰 Sales Report</a>
+                <a href="#" class="nav-item" data-page="archived">📦 Archived</a>
                 <a href="#" class="nav-item" data-page="appointments">📅 Appointments</a>
             </nav>
             <div class="sidebar-footer">
@@ -222,6 +224,86 @@
                         </thead>
                         <tbody id="appointmentsTableBody">
                             <tr><td colspan="7" class="loading">Loading...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Sales Report Page -->
+            <div class="page" id="salesPage">
+                <div class="page-header">
+                    <h1>Sales Report</h1>
+                    <p>Track all sold and rented properties</p>
+                </div>
+                
+                <div class="sales-summary-admin" id="salesSummaryAdmin">
+                    <div class="summary-card green">
+                        <div class="summary-value" id="adminTotalSales">-</div>
+                        <div class="summary-label">Total Sales</div>
+                    </div>
+                    <div class="summary-card blue">
+                        <div class="summary-value" id="adminTotalValue">-</div>
+                        <div class="summary-label">Total Value</div>
+                    </div>
+                </div>
+                
+                <div class="filters">
+                    <select id="salesAgentFilter" onchange="loadSalesReport()">
+                        <option value="">All Agents</option>
+                    </select>
+                    <div class="filter-group">
+                        <label>From:</label>
+                        <input type="date" id="salesStartDate" onchange="loadSalesReport()">
+                    </div>
+                    <div class="filter-group">
+                        <label>To:</label>
+                        <input type="date" id="salesEndDate" onchange="loadSalesReport()">
+                    </div>
+                    <button class="btn btn-secondary btn-sm" onclick="clearSalesFilters()">Clear</button>
+                    <button class="btn btn-primary btn-sm" onclick="exportSalesCSV()">📊 Export CSV</button>
+                </div>
+                
+                <div class="table-container">
+                    <table class="data-table" id="salesTable">
+                        <thead>
+                            <tr>
+                                <th>Property</th>
+                                <th>Address</th>
+                                <th>Price</th>
+                                <th>Listing Agent</th>
+                                <th>Sold By</th>
+                                <th>Status</th>
+                                <th>Sold Date</th>
+                            </tr>
+                        </thead>
+                        <tbody id="salesTableBody">
+                            <tr><td colspan="7" class="loading">Loading...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Archived Properties Page -->
+            <div class="page" id="archivedPage">
+                <div class="page-header">
+                    <h1>Archived Properties</h1>
+                    <p>Sold/rented properties that have been archived</p>
+                </div>
+                
+                <div class="table-container">
+                    <table class="data-table" id="archivedTable">
+                        <thead>
+                            <tr>
+                                <th>Property</th>
+                                <th>Address</th>
+                                <th>Price</th>
+                                <th>Status</th>
+                                <th>Sold Date</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="archivedTableBody">
+                            <tr><td colspan="6" class="loading">Loading...</td></tr>
                         </tbody>
                     </table>
                 </div>
@@ -423,6 +505,32 @@
                 </div>
                 <div class="error-message hidden" id="appointmentError"></div>
                 <button type="submit" class="btn btn-primary btn-full">Save Changes</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Mark as Sold Modal (Admin) -->
+    <div class="modal" id="markSoldModal">
+        <div class="modal-content">
+            <span class="close" onclick="closeModal('markSoldModal')">&times;</span>
+            <h2 id="markSoldModalTitle">Mark Property as Sold</h2>
+            <p id="markSoldPropertyName" class="form-value"></p>
+            <div class="warning-box">
+                ⚠️ This will cancel all pending appointments and notify customers.
+            </div>
+            <form id="markSoldForm" onsubmit="confirmMarkSold(event)">
+                <input type="hidden" id="markSoldPropertyId">
+                <input type="hidden" id="markSoldAction">
+                <div class="form-group">
+                    <label for="soldByAgentId">Credit Sale To Agent</label>
+                    <select id="soldByAgentId">
+                        <option value="">-- Select Agent --</option>
+                    </select>
+                </div>
+                <div class="form-actions">
+                    <button type="button" class="btn btn-secondary" onclick="closeModal('markSoldModal')">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Confirm</button>
+                </div>
             </form>
         </div>
     </div>
