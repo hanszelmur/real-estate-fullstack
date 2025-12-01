@@ -60,6 +60,9 @@ CREATE TABLE IF NOT EXISTS verifications (
 -- status: 'available', 'pending', 'sold', 'rented'
 -- type: 'house', 'apartment', 'condo', 'land', 'commercial'
 -- listing_type: 'sale', 'rent'
+-- sold_by_agent_id: Agent who closed the sale (for commission tracking)
+-- sold_date: When the sale was recorded
+-- is_archived: Soft delete for reporting (hides from customer listings)
 -- ============================================================================
 CREATE TABLE IF NOT EXISTS properties (
     id INT AUTO_INCREMENT PRIMARY KEY,
@@ -82,6 +85,9 @@ CREATE TABLE IF NOT EXISTS properties (
     image_url VARCHAR(500),
     created_by INT,
     assigned_agent_id INT,
+    sold_by_agent_id INT,
+    sold_date DATETIME,
+    is_archived BOOLEAN DEFAULT FALSE,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     INDEX idx_status (status),
@@ -89,8 +95,12 @@ CREATE TABLE IF NOT EXISTS properties (
     INDEX idx_price (price),
     INDEX idx_property_type (property_type),
     INDEX idx_listing_type (listing_type),
+    INDEX idx_sold_by_agent (sold_by_agent_id),
+    INDEX idx_sold_date (sold_date),
+    INDEX idx_is_archived (is_archived),
     FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE SET NULL,
-    FOREIGN KEY (assigned_agent_id) REFERENCES users(id) ON DELETE SET NULL
+    FOREIGN KEY (assigned_agent_id) REFERENCES users(id) ON DELETE SET NULL,
+    FOREIGN KEY (sold_by_agent_id) REFERENCES users(id) ON DELETE SET NULL
 );
 
 -- ============================================================================
