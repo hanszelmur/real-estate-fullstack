@@ -113,6 +113,8 @@ function navigateTo(pageName) {
         case 'dashboard': loadDashboardData(); break;
         case 'users': loadUsers(); break;
         case 'properties': loadProperties(); break;
+        case 'sales': loadSalesReport(); break;
+        case 'archived': loadArchivedProperties(); break;
         case 'appointments': loadAppointments(); break;
     }
 }
@@ -279,7 +281,11 @@ async function loadProperties() {
     if (response.ok) {
         propertiesData = response.data.properties;
         
-        tbody.innerHTML = propertiesData.map(p => `
+        tbody.innerHTML = propertiesData.map(p => {
+            const showSaleButtons = ['available', 'pending'].includes(p.status);
+            const showArchiveButton = ['sold', 'rented'].includes(p.status) && !p.is_archived;
+            const isForRent = p.listing_type === 'rent';
+            return `
             <tr>
                 <td>${p.id}</td>
                 <td>${p.title}</td>
@@ -290,10 +296,12 @@ async function loadProperties() {
                 <td>${p.agent_first_name ? `${p.agent_first_name} ${p.agent_last_name}` : '-'}</td>
                 <td>
                     <button class="btn btn-sm btn-primary" onclick="editProperty(${p.id})">Edit</button>
+                    ${showSaleButtons ? `<button class="btn btn-sm btn-success" onclick="showMarkSoldModal(${p.id}, '${escapeHtml(p.title)}', '${isForRent ? 'rented' : 'sold'}')">${isForRent ? 'Rented' : 'Sold'}</button>` : ''}
+                    ${showArchiveButton ? `<button class="btn btn-sm btn-secondary" onclick="archiveProperty(${p.id})">Archive</button>` : ''}
                     <button class="btn btn-sm btn-danger" onclick="deleteProperty(${p.id})">Delete</button>
                 </td>
             </tr>
-        `).join('') || '<tr><td colspan="8">No properties found</td></tr>';
+        `}).join('') || '<tr><td colspan="8">No properties found</td></tr>';
     }
 }
 
@@ -677,6 +685,235 @@ function getStatusBadge(status) {
         case 'sold': case 'rented': return 'badge-info';
         case 'cancelled': return 'badge-danger';
         default: return 'badge-secondary';
+    }
+}
+
+// ============================================================================
+// SALES TRACKING FUNCTIONS
+// ============================================================================
+
+/**
+ * Load sales report
+ */
+async function loadSalesReport() {
+    const tbody = document.getElementById('salesTableBody');
+    tbody.innerHTML = '<tr><td colspan="7" class="loading">Loading...</td></tr>';
+    
+    // Update agents dropdown for filter
+    updateSalesAgentDropdown();
+    
+    const agentId = document.getElementById('salesAgentFilter')?.value || '';
+    const startDate = document.getElementById('salesStartDate')?.value || '';
+    const endDate = document.getElementById('salesEndDate')?.value || '';
+    
+    let endpoint = '/properties/sold?limit=100';
+    if (agentId) endpoint += `&agentId=${agentId}`;
+    if (startDate) endpoint += `&startDate=${startDate}`;
+    if (endDate) endpoint += `&endDate=${endDate}`;
+    
+    const response = await API.get(endpoint);
+    
+    if (response.ok && response.data.success) {
+        const { properties, summary } = response.data;
+        
+        // Update summary stats
+        document.getElementById('adminTotalSales').textContent = summary.totalSales;
+        document.getElementById('adminTotalValue').textContent = '$' + formatPrice(summary.totalValue);
+        
+        if (properties.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="7" class="text-center">No sales found</td></tr>';
+            return;
+        }
+        
+        tbody.innerHTML = properties.map(p => `
+            <tr>
+                <td>${escapeHtml(p.title)}</td>
+                <td>${escapeHtml(p.address)}, ${escapeHtml(p.city)}</td>
+                <td>$${formatPrice(p.price)}</td>
+                <td>${p.agent_first_name ? `${p.agent_first_name} ${p.agent_last_name}` : '-'}</td>
+                <td>${p.sold_by_first_name ? `${p.sold_by_first_name} ${p.sold_by_last_name}` : '-'}</td>
+                <td><span class="badge ${getStatusBadge(p.status)}">${capitalize(p.status)}</span></td>
+                <td>${p.sold_date ? formatDate(p.sold_date) : '-'}</td>
+            </tr>
+        `).join('');
+    } else {
+        tbody.innerHTML = '<tr><td colspan="7" class="text-center">Failed to load sales data</td></tr>';
+    }
+}
+
+/**
+ * Update sales agent filter dropdown
+ */
+function updateSalesAgentDropdown() {
+    const select = document.getElementById('salesAgentFilter');
+    if (select && agentsData.length > 0) {
+        const currentValue = select.value;
+        select.innerHTML = '<option value="">All Agents</option>' +
+            agentsData.map(a => `<option value="${a.id}">${a.first_name} ${a.last_name}</option>`).join('');
+        select.value = currentValue;
+    }
+}
+
+/**
+ * Clear sales filters
+ */
+function clearSalesFilters() {
+    document.getElementById('salesAgentFilter').value = '';
+    document.getElementById('salesStartDate').value = '';
+    document.getElementById('salesEndDate').value = '';
+    loadSalesReport();
+}
+
+/**
+ * Export sales to CSV
+ */
+function exportSalesCSV() {
+    const rows = [];
+    const table = document.getElementById('salesTable');
+    const headers = Array.from(table.querySelectorAll('th')).map(th => th.textContent);
+    rows.push(headers.join(','));
+    
+    const dataRows = table.querySelectorAll('tbody tr');
+    dataRows.forEach(row => {
+        const cells = Array.from(row.querySelectorAll('td')).map(td => {
+            let text = td.textContent.trim();
+            // Escape quotes and wrap in quotes if contains comma
+            if (text.includes(',') || text.includes('"')) {
+                text = '"' + text.replace(/"/g, '""') + '"';
+            }
+            return text;
+        });
+        if (cells.length > 1) { // Skip loading rows
+            rows.push(cells.join(','));
+        }
+    });
+    
+    const csv = rows.join('\n');
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `sales-report-${new Date().toISOString().split('T')[0]}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+}
+
+/**
+ * Load archived properties
+ */
+async function loadArchivedProperties() {
+    const tbody = document.getElementById('archivedTableBody');
+    tbody.innerHTML = '<tr><td colspan="6" class="loading">Loading...</td></tr>';
+    
+    const response = await API.get('/properties/archived?limit=100');
+    
+    if (response.ok && response.data.success) {
+        const { properties } = response.data;
+        
+        if (properties.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="6" class="text-center">No archived properties</td></tr>';
+            return;
+        }
+        
+        tbody.innerHTML = properties.map(p => `
+            <tr>
+                <td>${escapeHtml(p.title)}</td>
+                <td>${escapeHtml(p.address)}, ${escapeHtml(p.city)}</td>
+                <td>$${formatPrice(p.price)}</td>
+                <td><span class="badge ${getStatusBadge(p.status)}">${capitalize(p.status)}</span></td>
+                <td>${p.sold_date ? formatDate(p.sold_date) : '-'}</td>
+                <td>
+                    <button class="btn btn-sm btn-primary" onclick="unarchiveProperty(${p.id})">Unarchive</button>
+                </td>
+            </tr>
+        `).join('');
+    } else {
+        tbody.innerHTML = '<tr><td colspan="6" class="text-center">Failed to load archived properties</td></tr>';
+    }
+}
+
+/**
+ * Show mark as sold modal (Admin)
+ */
+function showMarkSoldModal(propertyId, propertyTitle, action) {
+    document.getElementById('markSoldPropertyId').value = propertyId;
+    document.getElementById('markSoldAction').value = action;
+    document.getElementById('markSoldPropertyName').textContent = propertyTitle;
+    document.getElementById('markSoldModalTitle').textContent = 
+        action === 'rented' ? 'Mark Property as Rented' : 'Mark Property as Sold';
+    
+    // Update agent dropdown
+    const select = document.getElementById('soldByAgentId');
+    select.innerHTML = '<option value="">-- Select Agent --</option>' +
+        agentsData.map(a => `<option value="${a.id}">${a.first_name} ${a.last_name}</option>`).join('');
+    
+    openModal('markSoldModal');
+}
+
+/**
+ * Confirm mark sold (Admin)
+ */
+async function confirmMarkSold(event) {
+    event.preventDefault();
+    
+    const propertyId = document.getElementById('markSoldPropertyId').value;
+    const action = document.getElementById('markSoldAction').value;
+    const soldByAgentId = document.getElementById('soldByAgentId').value;
+    
+    const endpoint = action === 'rented' 
+        ? `/properties/${propertyId}/mark-rented`
+        : `/properties/${propertyId}/mark-sold`;
+    
+    const body = soldByAgentId ? { soldByAgentId: parseInt(soldByAgentId) } : {};
+    
+    const response = await API.put(endpoint, body);
+    
+    if (response.ok && response.data.success) {
+        closeModal('markSoldModal');
+        loadProperties();
+        
+        const cancelledCount = response.data.cancelledAppointments || 0;
+        alert(`Property marked as ${action}. ${cancelledCount} appointment(s) cancelled.`);
+    } else {
+        alert(response.data.error || 'Failed to update property status.');
+    }
+}
+
+/**
+ * Archive a property (Admin)
+ */
+async function archiveProperty(propertyId) {
+    if (!confirm('Are you sure you want to archive this property?')) {
+        return;
+    }
+    
+    const response = await API.put(`/properties/${propertyId}/archive`, {});
+    
+    if (response.ok && response.data.success) {
+        loadProperties();
+        alert('Property archived successfully.');
+    } else {
+        alert(response.data.error || 'Failed to archive property.');
+    }
+}
+
+/**
+ * Unarchive a property (Admin only)
+ */
+async function unarchiveProperty(propertyId) {
+    if (!confirm('Are you sure you want to unarchive this property?')) {
+        return;
+    }
+    
+    const response = await API.put(`/properties/${propertyId}/unarchive`, {});
+    
+    if (response.ok && response.data.success) {
+        loadArchivedProperties();
+        alert('Property unarchived successfully.');
+    } else {
+        alert(response.data.error || 'Failed to unarchive property.');
     }
 }
 

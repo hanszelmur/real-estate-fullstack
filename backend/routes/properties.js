@@ -104,6 +104,7 @@ router.get('/', optionalAuth, async (req, res) => {
             listingType, 
             bedrooms,
             status,
+            includeArchived,
             page = 1,
             limit = 20
         } = req.query;
@@ -114,12 +115,22 @@ router.get('/', optionalAuth, async (req, res) => {
                    u.first_name as agent_first_name, 
                    u.last_name as agent_last_name,
                    u.email as agent_email,
-                   u.phone as agent_phone
+                   u.phone as agent_phone,
+                   s.first_name as sold_by_first_name,
+                   s.last_name as sold_by_last_name
             FROM properties p
             LEFT JOIN users u ON p.assigned_agent_id = u.id
+            LEFT JOIN users s ON p.sold_by_agent_id = s.id
             WHERE 1=1
         `;
         const params = [];
+        
+        // Exclude archived properties by default (admin can include with ?includeArchived=true)
+        if (req.user && req.user.role === 'admin' && includeArchived === 'true') {
+            // Admin requesting archived - no filter
+        } else {
+            sql += ' AND (p.is_archived = FALSE OR p.is_archived IS NULL)';
+        }
         
         // Only show available properties to public/customers
         if (!req.user || req.user.role === 'customer') {
@@ -178,6 +189,13 @@ router.get('/', optionalAuth, async (req, res) => {
         // Get total count for pagination
         let countSql = 'SELECT COUNT(*) as total FROM properties WHERE 1=1';
         const countParams = [];
+        
+        // Apply same archive filter to count
+        if (req.user && req.user.role === 'admin' && includeArchived === 'true') {
+            // Admin requesting archived - no filter
+        } else {
+            countSql += ' AND (is_archived = FALSE OR is_archived IS NULL)';
+        }
         
         if (!req.user || req.user.role === 'customer') {
             countSql += ' AND status = ?';
@@ -238,6 +256,197 @@ router.get('/featured', async (req, res) => {
         res.status(500).json({
             success: false,
             error: 'Failed to fetch featured properties.'
+        });
+    }
+});
+
+/**
+ * GET /api/properties/sold
+ * List sold properties with agent info
+ * 
+ * @access Admin, Agent
+ * @query agentId - Filter by sold_by_agent_id (admin only)
+ * @query startDate - Filter from date (YYYY-MM-DD)
+ * @query endDate - Filter to date (YYYY-MM-DD)
+ * @query page, limit - Pagination
+ * 
+ * Agent View: Only their sales (sold_by_agent_id = current_user)
+ * Admin View: All sales, can filter by agent
+ */
+router.get('/sold', authenticate, requireRole('admin', 'agent'), async (req, res) => {
+    try {
+        const { agentId, startDate, endDate, page = 1, limit = 20 } = req.query;
+        
+        let sql = `
+            SELECT p.*, 
+                   u.first_name as agent_first_name, 
+                   u.last_name as agent_last_name,
+                   u.email as agent_email,
+                   s.first_name as sold_by_first_name,
+                   s.last_name as sold_by_last_name,
+                   s.email as sold_by_email
+            FROM properties p
+            LEFT JOIN users u ON p.assigned_agent_id = u.id
+            LEFT JOIN users s ON p.sold_by_agent_id = s.id
+            WHERE p.status IN ('sold', 'rented')
+        `;
+        const params = [];
+        
+        // Agents can only see their own sales
+        if (req.user.role === 'agent') {
+            sql += ' AND p.sold_by_agent_id = ?';
+            params.push(req.user.id);
+        } else if (agentId) {
+            // Admin can filter by agent
+            sql += ' AND p.sold_by_agent_id = ?';
+            params.push(parseInt(agentId));
+        }
+        
+        // Date filters
+        if (startDate) {
+            sql += ' AND p.sold_date >= ?';
+            params.push(startDate);
+        }
+        
+        if (endDate) {
+            sql += ' AND p.sold_date <= ?';
+            params.push(endDate + ' 23:59:59');
+        }
+        
+        sql += ' ORDER BY p.sold_date DESC';
+        
+        const offset = (parseInt(page) - 1) * parseInt(limit);
+        sql += ' LIMIT ? OFFSET ?';
+        params.push(parseInt(limit), offset);
+        
+        const properties = await db.query(sql, params);
+        
+        // Get total count
+        let countSql = `SELECT COUNT(*) as total FROM properties WHERE status IN ('sold', 'rented')`;
+        const countParams = [];
+        
+        if (req.user.role === 'agent') {
+            countSql += ' AND sold_by_agent_id = ?';
+            countParams.push(req.user.id);
+        } else if (agentId) {
+            countSql += ' AND sold_by_agent_id = ?';
+            countParams.push(parseInt(agentId));
+        }
+        
+        if (startDate) {
+            countSql += ' AND sold_date >= ?';
+            countParams.push(startDate);
+        }
+        
+        if (endDate) {
+            countSql += ' AND sold_date <= ?';
+            countParams.push(endDate + ' 23:59:59');
+        }
+        
+        const countResult = await db.query(countSql, countParams);
+        const total = countResult[0].total;
+        
+        // Calculate summary stats
+        let summaryParams = [];
+        let summarySql = `
+            SELECT 
+                COUNT(*) as totalSales,
+                COALESCE(SUM(price), 0) as totalValue
+            FROM properties 
+            WHERE status IN ('sold', 'rented')
+        `;
+        
+        if (req.user.role === 'agent') {
+            summarySql += ' AND sold_by_agent_id = ?';
+            summaryParams.push(req.user.id);
+        } else if (agentId) {
+            summarySql += ' AND sold_by_agent_id = ?';
+            summaryParams.push(parseInt(agentId));
+        }
+        
+        if (startDate) {
+            summarySql += ' AND sold_date >= ?';
+            summaryParams.push(startDate);
+        }
+        
+        if (endDate) {
+            summarySql += ' AND sold_date <= ?';
+            summaryParams.push(endDate + ' 23:59:59');
+        }
+        
+        const summaryResult = await db.query(summarySql, summaryParams);
+        
+        res.json({
+            success: true,
+            properties,
+            summary: {
+                totalSales: summaryResult[0].totalSales,
+                totalValue: parseFloat(summaryResult[0].totalValue) || 0
+            },
+            pagination: {
+                page: parseInt(page),
+                limit: parseInt(limit),
+                total,
+                totalPages: Math.ceil(total / parseInt(limit))
+            }
+        });
+        
+    } catch (error) {
+        console.error('List sold properties error:', error);
+        res.status(500).json({
+            success: false,
+            error: 'Failed to fetch sold properties.'
+        });
+    }
+});
+
+/**
+ * GET /api/properties/archived
+ * List archived properties
+ * 
+ * @access Admin only
+ */
+router.get('/archived', authenticate, requireRole('admin'), async (req, res) => {
+    try {
+        const { page = 1, limit = 20 } = req.query;
+        
+        let sql = `
+            SELECT p.*, 
+                   u.first_name as agent_first_name, 
+                   u.last_name as agent_last_name,
+                   s.first_name as sold_by_first_name,
+                   s.last_name as sold_by_last_name
+            FROM properties p
+            LEFT JOIN users u ON p.assigned_agent_id = u.id
+            LEFT JOIN users s ON p.sold_by_agent_id = s.id
+            WHERE p.is_archived = TRUE
+            ORDER BY p.sold_date DESC
+        `;
+        
+        const offset = (parseInt(page) - 1) * parseInt(limit);
+        sql += ' LIMIT ? OFFSET ?';
+        
+        const properties = await db.query(sql, [parseInt(limit), offset]);
+        
+        const countResult = await db.query('SELECT COUNT(*) as total FROM properties WHERE is_archived = TRUE');
+        const total = countResult[0].total;
+        
+        res.json({
+            success: true,
+            properties,
+            pagination: {
+                page: parseInt(page),
+                limit: parseInt(limit),
+                total,
+                totalPages: Math.ceil(total / parseInt(limit))
+            }
+        });
+        
+    } catch (error) {
+        console.error('List archived properties error:', error);
+        res.status(500).json({
+            success: false,
+            error: 'Failed to fetch archived properties.'
         });
     }
 });
@@ -890,6 +1099,338 @@ router.delete('/:propertyId/photos/:photoId', authenticate, requireRole('admin',
         res.status(500).json({
             success: false,
             error: 'Failed to delete photo.'
+        });
+    }
+});
+
+/**
+ * PUT /api/properties/:id/mark-sold
+ * Mark a property as sold
+ * 
+ * @access Admin, Agent (own properties only)
+ * @body soldByAgentId - Agent who closed the deal (Admin can specify, Agent defaults to self)
+ * 
+ * - Updates status to 'sold'
+ * - Sets sold_by_agent_id and sold_date
+ * - Auto-cancels pending/confirmed appointments
+ * - Creates notifications for affected customers
+ */
+router.put('/:id/mark-sold', authenticate, requireRole('admin', 'agent'), async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { soldByAgentId } = req.body;
+        
+        // Check if property exists
+        const properties = await db.query('SELECT * FROM properties WHERE id = ?', [id]);
+        
+        if (properties.length === 0) {
+            return res.status(404).json({
+                success: false,
+                error: 'Property not found.'
+            });
+        }
+        
+        const property = properties[0];
+        
+        // Agents can only mark their own properties as sold
+        if (req.user.role === 'agent' && property.assigned_agent_id !== req.user.id) {
+            return res.status(403).json({
+                success: false,
+                error: 'You can only mark properties assigned to you as sold.'
+            });
+        }
+        
+        // Check if property is already sold
+        if (property.status === 'sold') {
+            return res.status(400).json({
+                success: false,
+                error: 'Property is already marked as sold.'
+            });
+        }
+        
+        // Determine who gets credit for the sale
+        const agentId = req.user.role === 'admin' && soldByAgentId 
+            ? parseInt(soldByAgentId) 
+            : req.user.id;
+        
+        // Update property status
+        await db.query(`
+            UPDATE properties 
+            SET status = 'sold', sold_by_agent_id = ?, sold_date = NOW()
+            WHERE id = ?
+        `, [agentId, id]);
+        
+        // Get affected appointments (pending or confirmed)
+        const appointments = await db.query(`
+            SELECT a.id, a.customer_id, u.email, u.first_name
+            FROM appointments a
+            JOIN users u ON a.customer_id = u.id
+            WHERE a.property_id = ? AND a.status IN ('pending', 'confirmed', 'queued')
+        `, [id]);
+        
+        // Cancel all affected appointments and create notifications
+        if (appointments.length > 0) {
+            await db.query(`
+                UPDATE appointments 
+                SET status = 'cancelled' 
+                WHERE property_id = ? AND status IN ('pending', 'confirmed', 'queued')
+            `, [id]);
+            
+            // Create notifications for each affected customer
+            for (const apt of appointments) {
+                await db.query(`
+                    INSERT INTO notifications (user_id, type, title, message)
+                    VALUES (?, 'property', 'Property Sold', ?)
+                `, [apt.customer_id, `The property "${property.title}" you had an appointment for has been sold. Your appointment has been cancelled.`]);
+            }
+        }
+        
+        // Fetch updated property
+        const updatedProperties = await db.query(`
+            SELECT p.*, 
+                   s.first_name as sold_by_first_name,
+                   s.last_name as sold_by_last_name
+            FROM properties p
+            LEFT JOIN users s ON p.sold_by_agent_id = s.id
+            WHERE p.id = ?
+        `, [id]);
+        
+        console.log(`[PROPERTY] Property ${id} marked as sold by agent ${agentId}. ${appointments.length} appointments cancelled.`);
+        
+        res.json({
+            success: true,
+            message: `Property marked as sold. ${appointments.length} appointment(s) cancelled.`,
+            property: updatedProperties[0],
+            cancelledAppointments: appointments.length
+        });
+        
+    } catch (error) {
+        console.error('Mark property sold error:', error);
+        res.status(500).json({
+            success: false,
+            error: 'Failed to mark property as sold.'
+        });
+    }
+});
+
+/**
+ * PUT /api/properties/:id/mark-rented
+ * Mark a property as rented
+ * 
+ * @access Admin, Agent (own properties only)
+ * @body soldByAgentId - Agent who closed the deal
+ * 
+ * Same logic as mark-sold but status = 'rented'
+ */
+router.put('/:id/mark-rented', authenticate, requireRole('admin', 'agent'), async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { soldByAgentId } = req.body;
+        
+        // Check if property exists
+        const properties = await db.query('SELECT * FROM properties WHERE id = ?', [id]);
+        
+        if (properties.length === 0) {
+            return res.status(404).json({
+                success: false,
+                error: 'Property not found.'
+            });
+        }
+        
+        const property = properties[0];
+        
+        // Agents can only mark their own properties as rented
+        if (req.user.role === 'agent' && property.assigned_agent_id !== req.user.id) {
+            return res.status(403).json({
+                success: false,
+                error: 'You can only mark properties assigned to you as rented.'
+            });
+        }
+        
+        // Check if property is already rented
+        if (property.status === 'rented') {
+            return res.status(400).json({
+                success: false,
+                error: 'Property is already marked as rented.'
+            });
+        }
+        
+        // Determine who gets credit for the rental
+        const agentId = req.user.role === 'admin' && soldByAgentId 
+            ? parseInt(soldByAgentId) 
+            : req.user.id;
+        
+        // Update property status
+        await db.query(`
+            UPDATE properties 
+            SET status = 'rented', sold_by_agent_id = ?, sold_date = NOW()
+            WHERE id = ?
+        `, [agentId, id]);
+        
+        // Get affected appointments (pending or confirmed)
+        const appointments = await db.query(`
+            SELECT a.id, a.customer_id, u.email, u.first_name
+            FROM appointments a
+            JOIN users u ON a.customer_id = u.id
+            WHERE a.property_id = ? AND a.status IN ('pending', 'confirmed', 'queued')
+        `, [id]);
+        
+        // Cancel all affected appointments and create notifications
+        if (appointments.length > 0) {
+            await db.query(`
+                UPDATE appointments 
+                SET status = 'cancelled' 
+                WHERE property_id = ? AND status IN ('pending', 'confirmed', 'queued')
+            `, [id]);
+            
+            // Create notifications for each affected customer
+            for (const apt of appointments) {
+                await db.query(`
+                    INSERT INTO notifications (user_id, type, title, message)
+                    VALUES (?, 'property', 'Property Rented', ?)
+                `, [apt.customer_id, `The property "${property.title}" you had an appointment for has been rented. Your appointment has been cancelled.`]);
+            }
+        }
+        
+        // Fetch updated property
+        const updatedProperties = await db.query(`
+            SELECT p.*, 
+                   s.first_name as sold_by_first_name,
+                   s.last_name as sold_by_last_name
+            FROM properties p
+            LEFT JOIN users s ON p.sold_by_agent_id = s.id
+            WHERE p.id = ?
+        `, [id]);
+        
+        console.log(`[PROPERTY] Property ${id} marked as rented by agent ${agentId}. ${appointments.length} appointments cancelled.`);
+        
+        res.json({
+            success: true,
+            message: `Property marked as rented. ${appointments.length} appointment(s) cancelled.`,
+            property: updatedProperties[0],
+            cancelledAppointments: appointments.length
+        });
+        
+    } catch (error) {
+        console.error('Mark property rented error:', error);
+        res.status(500).json({
+            success: false,
+            error: 'Failed to mark property as rented.'
+        });
+    }
+});
+
+/**
+ * PUT /api/properties/:id/archive
+ * Archive a sold or rented property
+ * 
+ * @access Admin, Agent (own properties only)
+ * @requires Property must be sold or rented
+ */
+router.put('/:id/archive', authenticate, requireRole('admin', 'agent'), async (req, res) => {
+    try {
+        const { id } = req.params;
+        
+        // Check if property exists
+        const properties = await db.query('SELECT * FROM properties WHERE id = ?', [id]);
+        
+        if (properties.length === 0) {
+            return res.status(404).json({
+                success: false,
+                error: 'Property not found.'
+            });
+        }
+        
+        const property = properties[0];
+        
+        // Agents can only archive their own properties
+        if (req.user.role === 'agent' && property.assigned_agent_id !== req.user.id) {
+            return res.status(403).json({
+                success: false,
+                error: 'You can only archive properties assigned to you.'
+            });
+        }
+        
+        // Property must be sold or rented to archive
+        if (!['sold', 'rented'].includes(property.status)) {
+            return res.status(400).json({
+                success: false,
+                error: 'Only sold or rented properties can be archived.'
+            });
+        }
+        
+        // Check if already archived
+        if (property.is_archived) {
+            return res.status(400).json({
+                success: false,
+                error: 'Property is already archived.'
+            });
+        }
+        
+        // Archive the property
+        await db.query('UPDATE properties SET is_archived = TRUE WHERE id = ?', [id]);
+        
+        console.log(`[PROPERTY] Property ${id} archived by ${req.user.role} ${req.user.id}`);
+        
+        res.json({
+            success: true,
+            message: 'Property archived successfully.'
+        });
+        
+    } catch (error) {
+        console.error('Archive property error:', error);
+        res.status(500).json({
+            success: false,
+            error: 'Failed to archive property.'
+        });
+    }
+});
+
+/**
+ * PUT /api/properties/:id/unarchive
+ * Unarchive a property
+ * 
+ * @access Admin only
+ */
+router.put('/:id/unarchive', authenticate, requireRole('admin'), async (req, res) => {
+    try {
+        const { id } = req.params;
+        
+        // Check if property exists
+        const properties = await db.query('SELECT * FROM properties WHERE id = ?', [id]);
+        
+        if (properties.length === 0) {
+            return res.status(404).json({
+                success: false,
+                error: 'Property not found.'
+            });
+        }
+        
+        const property = properties[0];
+        
+        // Check if property is archived
+        if (!property.is_archived) {
+            return res.status(400).json({
+                success: false,
+                error: 'Property is not archived.'
+            });
+        }
+        
+        // Unarchive the property
+        await db.query('UPDATE properties SET is_archived = FALSE WHERE id = ?', [id]);
+        
+        console.log(`[PROPERTY] Property ${id} unarchived by admin ${req.user.id}`);
+        
+        res.json({
+            success: true,
+            message: 'Property unarchived successfully.'
+        });
+        
+    } catch (error) {
+        console.error('Unarchive property error:', error);
+        res.status(500).json({
+            success: false,
+            error: 'Failed to unarchive property.'
         });
     }
 });

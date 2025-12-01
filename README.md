@@ -69,6 +69,9 @@ This is a **production-ready fullstack starter** for building real estate platfo
 | **Image Upload** | Upload multiple images per property via multipart/form-data | Admin, Agent |
 | **Image Gallery** | Display property images in a browsable gallery | All |
 | **Legacy Image URLs** | Backward compatible support for external image URLs | Admin, Agent |
+| **Mark as Sold/Rented** | One-click property status change with appointment cancellation | Admin, Agent |
+| **Sales Tracking** | Track who sold each property for commission purposes | Admin, Agent |
+| **Archive System** | Archive sold/rented properties to clean up listings | Admin, Agent |
 
 ### 📅 Booking System (Second-Level Precision)
 | Feature | Description |
@@ -396,6 +399,47 @@ SELECT
 FROM agent_ratings WHERE agent_id = ?
 ```
 
+### Property Lifecycle & Sales Tracking
+
+**Property Status Flow:**
+
+```
+  Available → Pending → Sold/Rented → Archived
+       │         │           │
+       │         │           └── Archive removes from active listings
+       │         └── Manual status change
+       └── Default for new properties
+```
+
+**Key Fields for Sales Tracking:**
+
+| Field | Purpose | Set By |
+|-------|---------|--------|
+| `assigned_agent_id` | Who manages the listing | Admin (or auto-set for agent-created properties) |
+| `sold_by_agent_id` | Who closed the sale (for commission tracking) | Agent who clicks "Mark as Sold" or Admin selection |
+| `sold_date` | When the sale was recorded | System (auto-set on mark sold) |
+| `is_archived` | Soft delete for reporting | Agent/Admin after sale |
+
+**Mark as Sold/Rented Workflow:**
+
+1. Agent clicks "Mark as Sold" or "Mark as Rented" on property card
+2. Confirmation modal explains consequences:
+   - All pending/confirmed appointments will be cancelled
+   - Customers will receive notifications
+3. On confirmation:
+   - Property status updated to 'sold' or 'rented'
+   - `sold_by_agent_id` set to the closing agent
+   - `sold_date` set to current timestamp
+   - Pending appointments auto-cancelled
+   - Notifications sent to affected customers
+
+**Sales Report Features:**
+
+- Agents can view "My Sales" showing their closed deals
+- Admin can view all sales and filter by agent
+- Summary stats: Total sales count, Total sales value
+- CSV export for commission calculations
+
 ### Role-Based Access Control
 
 **Server-Side Enforcement:**
@@ -406,6 +450,10 @@ FROM agent_ratings WHERE agent_id = ?
 | Create property | ❌ | ✅ Auto-assigned | ✅ Assign any |
 | Edit property | ❌ | ✅ Own only | ✅ Any |
 | Delete property | ❌ | ❌ | ✅ |
+| Mark as sold/rented | ❌ | ✅ Own only | ✅ Any |
+| Archive property | ❌ | ✅ Own (sold only) | ✅ Any (sold only) |
+| Unarchive property | ❌ | ❌ | ✅ |
+| View sales report | ❌ | ✅ Own only | ✅ All |
 | Book appointment | ✅ | ❌ | ❌ |
 | Confirm appointment | ❌ | ✅ Own | ✅ Any |
 | Cancel appointment | ✅ Own | ✅ Own | ✅ Any |

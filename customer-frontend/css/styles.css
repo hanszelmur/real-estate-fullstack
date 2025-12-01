@@ -979,3 +979,95 @@ a {
         font-size: 1rem;
     }
 }
+
+/* ============================================================================
+   Property Status Overlay Styles (Sold/Rented)
+   ============================================================================ */
+
+/* Status Overlay on Property Cards */
+.status-overlay {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%) rotate(-30deg);
+    padding: 10px 30px;
+    font-weight: bold;
+    font-size: 1.2rem;
+    text-transform: uppercase;
+    letter-spacing: 3px;
+    border: 3px solid;
+    z-index: 5;
+}
+
+.status-overlay.sold {
+    background: rgba(231, 76, 60, 0.9);
+    color: white;
+    border-color: #c0392b;
+}
+
+.status-overlay.rented {
+    background: rgba(52, 152, 219, 0.9);
+    color: white;
+    border-color: #2980b9;
+}
+
+/* Property Card Unavailable State */
+.property-card.unavailable {
+    opacity: 0.85;
+}
+
+.property-card.unavailable .property-image::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.2);
+    pointer-events: none;
+}
+
+/* Unavailable Notice on Property Detail */
+.unavailable-notice {
+    text-align: center;
+    padding: 20px;
+    border-radius: 8px;
+    margin-top: 10px;
+}
+
+.unavailable-notice.sold {
+    background: #fdeaea;
+    border: 2px solid #e74c3c;
+}
+
+.unavailable-notice.rented {
+    background: #e8f4fd;
+    border: 2px solid #3498db;
+}
+
+.unavailable-notice .notice-badge {
+    display: inline-block;
+    padding: 8px 20px;
+    font-weight: bold;
+    font-size: 1rem;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    border-radius: 4px;
+    margin-bottom: 10px;
+}
+
+.unavailable-notice.sold .notice-badge {
+    background: #e74c3c;
+    color: white;
+}
+
+.unavailable-notice.rented .notice-badge {
+    background: #3498db;
+    color: white;
+}
+
+.unavailable-notice p {
+    color: #666;
+    margin: 0;
+    font-size: 0.95rem;
+}

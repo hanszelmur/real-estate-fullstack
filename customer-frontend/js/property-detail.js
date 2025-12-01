@@ -296,9 +296,21 @@ function renderPropertyDetail(property) {
             ` : ''}
             
             <div class="property-actions">
-                <button class="btn btn-primary btn-full" onclick="scheduleViewing()">
-                    📅 Schedule a Viewing
-                </button>
+                ${property.status === 'sold' ? `
+                    <div class="unavailable-notice sold">
+                        <span class="notice-badge">SOLD</span>
+                        <p>This property has been sold and is no longer available.</p>
+                    </div>
+                ` : property.status === 'rented' ? `
+                    <div class="unavailable-notice rented">
+                        <span class="notice-badge">RENTED</span>
+                        <p>This property has been rented and is no longer available.</p>
+                    </div>
+                ` : `
+                    <button class="btn btn-primary btn-full" onclick="scheduleViewing()">
+                        📅 Schedule a Viewing
+                    </button>
+                `}
             </div>
         </div>
     `;

@@ -6,10 +6,11 @@
   "scripts": {
     "start": "node server.js",
     "dev": "node server.js",
-    "test": "node tests/roles.test.js && node tests/queue.test.js && node tests/bookings.test.js",
+    "test": "node tests/roles.test.js && node tests/queue.test.js && node tests/bookings.test.js && node tests/sales.test.js",
     "test:roles": "node tests/roles.test.js",
     "test:queue": "node tests/queue.test.js",
-    "test:bookings": "node tests/bookings.test.js"
+    "test:bookings": "node tests/bookings.test.js",
+    "test:sales": "node tests/sales.test.js"
   },
   "keywords": [
     "real-estate",

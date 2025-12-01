@@ -40,6 +40,7 @@
             <div class="nav-links">
                 <a href="#" class="nav-link active" data-page="dashboard">Dashboard</a>
                 <a href="#" class="nav-link" data-page="properties">My Properties</a>
+                <a href="#" class="nav-link" data-page="sales">My Sales</a>
                 <a href="#" class="nav-link" data-page="appointments">Appointments</a>
             </div>
             <div class="user-info">
@@ -102,6 +103,29 @@
                 
                 <div class="property-list" id="propertyList">
                     <div class="loading">Loading properties...</div>
+                </div>
+            </div>
+
+            <!-- Sales Page -->
+            <div class="page" id="salesPage">
+                <div class="page-header">
+                    <h1>My Sales</h1>
+                    <p>Properties you've sold or rented (for commission tracking)</p>
+                </div>
+                
+                <div class="sales-summary" id="salesSummary">
+                    <div class="summary-card">
+                        <div class="summary-value" id="totalSalesCount">-</div>
+                        <div class="summary-label">Total Sales</div>
+                    </div>
+                    <div class="summary-card">
+                        <div class="summary-value" id="totalSalesValue">-</div>
+                        <div class="summary-label">Total Value</div>
+                    </div>
+                </div>
+                
+                <div class="sales-list" id="salesList">
+                    <div class="loading">Loading sales...</div>
                 </div>
             </div>
 
@@ -267,6 +291,29 @@
                 <div class="error-message hidden" id="propertyError"></div>
                 <button type="submit" class="btn btn-primary btn-full">Save Property</button>
             </form>
+        </div>
+    </div>
+
+    <!-- Mark as Sold/Rented Confirmation Modal -->
+    <div class="modal" id="markSoldModal">
+        <div class="modal-content">
+            <span class="close" onclick="closeModal('markSoldModal')">&times;</span>
+            <h2 id="markSoldModalTitle">Mark Property as Sold</h2>
+            <p id="markSoldPropertyName" class="modal-property-name"></p>
+            <div class="warning-message">
+                ⚠️ This action will:
+                <ul>
+                    <li>Update the property status</li>
+                    <li>Cancel all pending appointments</li>
+                    <li>Notify affected customers</li>
+                </ul>
+            </div>
+            <input type="hidden" id="markSoldPropertyId">
+            <input type="hidden" id="markSoldAction">
+            <div class="form-actions">
+                <button class="btn btn-secondary" onclick="closeModal('markSoldModal')">Cancel</button>
+                <button class="btn btn-primary" onclick="confirmMarkSold()">Confirm</button>
+            </div>
         </div>
     </div>
 

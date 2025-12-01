@@ -108,6 +108,11 @@ function createPropertyCard(property) {
     const badgeClass = property.featured ? 'featured' : (property.listing_type === 'rent' ? 'rent' : '');
     const badgeText = property.featured ? 'Featured' : (property.listing_type === 'rent' ? 'For Rent' : 'For Sale');
     
+    // Check if property is sold or rented
+    const isSold = property.status === 'sold';
+    const isRented = property.status === 'rented';
+    const isUnavailable = isSold || isRented;
+    
     // Escape user-controlled content to prevent XSS
     const safeTitle = escapeHtml(property.title);
     const safeAddress = escapeHtml(property.address);
@@ -118,12 +123,14 @@ function createPropertyCard(property) {
     const safeImageUrl = getPropertyImageUrl(property);
     
     return `
-        <div class="property-card" onclick="viewProperty(${parseInt(property.id)})">
+        <div class="property-card ${isUnavailable ? 'unavailable' : ''}" onclick="viewProperty(${parseInt(property.id)})">
             <div class="property-image">
                 ${safeImageUrl 
                     ? `<img src="${safeImageUrl}" alt="${safeTitle}">`
                     : '🏠'}
                 <span class="property-badge ${badgeClass}">${badgeText}</span>
+                ${isSold ? '<span class="status-overlay sold">SOLD</span>' : ''}
+                ${isRented ? '<span class="status-overlay rented">RENTED</span>' : ''}
             </div>
             <div class="property-info">
                 <div class="property-price">${priceDisplay}</div>

@@ -369,6 +369,13 @@ See the main README.md for the full roadmap. Key upcoming features:
 - ~~Agent can upload multiple images per property~~
 - ~~Customers see photo gallery on listings~~
 
+### ~~Property Lifecycle & Sales Tracking~~ ✅ Implemented
+- ~~Mark as Sold/Rented with one click~~
+- ~~Auto-cancel appointments and notify customers~~
+- ~~Sales tracking for agent commissions~~
+- ~~Archive system for sold properties~~
+- ~~Sales Report with filters and CSV export~~
+
 ### Saved/Favorited Properties
 - Customers can save properties for later
 - View and manage favorites list
@@ -529,6 +536,56 @@ If upgrading from a previous version without image upload support:
 5. Select 1-5 stars
 6. (Optional) Add written feedback
 7. Submit - agent sees rating in their dashboard
+```
+
+### Marking a Property as Sold/Rented (Agent)
+
+```
+1. Login to Agent portal
+2. Go to "My Properties" tab
+3. Find the property you sold/rented
+4. Click "Mark Sold" or "Mark Rented" button on the card
+5. Confirm in the modal dialog
+   - All pending appointments will be cancelled
+   - Affected customers will be notified automatically
+6. Property status updates and sale is recorded for commission tracking
+7. View your sales in the "My Sales" tab
+```
+
+### Marking a Property as Sold (Admin)
+
+```
+1. Login to Admin portal
+2. Go to Properties tab
+3. Find the property to mark as sold
+4. Click "Sold" or "Rented" button
+5. In the modal, select which agent gets credit for the sale
+6. Confirm - appointments cancelled, customers notified
+7. View in "Sales Report" tab with filters
+```
+
+### Archiving Sold Properties
+
+```
+1. Property must already be sold or rented
+2. Click "Archive" button on the property card
+3. Property moves to archived state:
+   - Hidden from customer listings
+   - Remains in sales reports for record-keeping
+4. Admin can unarchive from "Archived" tab if needed
+```
+
+### Viewing Sales Reports (Admin)
+
+```
+1. Login to Admin portal
+2. Go to "Sales Report" tab
+3. View all sold/rented properties
+4. Filter by:
+   - Agent (dropdown)
+   - Date range (start/end)
+5. Summary shows total sales count and value
+6. Export to CSV for commission calculations
 ```
 
 ---
