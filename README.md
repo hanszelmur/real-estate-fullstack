@@ -35,23 +35,21 @@ This release introduces complete property lifecycle management, enabling agents 
 
 #### Screenshots
 
-> **Note:** The screenshots below are placeholders. Capture actual screenshots by running the application and navigating to the respective pages.
-
 **Agent Portal - My Sales Tab:**
 
-<!-- Screenshot: screenshots/agent-sales.png - Navigate to Agent Portal > My Sales tab -->
+![Agent My Sales](screenshots/agent-my-sales.png)
 
 *View your closed deals with total count and value statistics.*
 
 **Admin Portal - Sales Report:**
 
-<!-- Screenshot: screenshots/admin-sales-report.png - Navigate to Admin Portal > Sales Report tab -->
+![Admin Sales Report](screenshots/admin-sales-report.png)
 
 *Filter sales by agent and date range, export to CSV for commission calculations.*
 
-**Customer Portal - Sold Property:**
+**Customer Portal - Sold Property Badge:**
 
-<!-- Screenshot: screenshots/customer-sold-badge.png - View a sold property in Customer Portal -->
+![Customer Sold Badge](screenshots/customer-sold-badge.png)
 
 *Properties display SOLD/RENTED overlay badges when no longer available.*
 
@@ -125,9 +123,9 @@ This is a **production-ready fullstack starter** for building real estate platfo
 | **Image Upload** | Upload multiple images per property via multipart/form-data | Admin, Agent |
 | **Image Gallery** | Display property images in a browsable gallery | All |
 | **Legacy Image URLs** | Backward compatible support for external image URLs | Admin, Agent |
-| **Mark as Sold/Rented** | One-click property status change with appointment cancellation | Admin, Agent |
-| **Sales Tracking** | Track who sold each property for commission purposes | Admin, Agent |
-| **Archive System** | Archive sold/rented properties to clean up listings | Admin, Agent |
+| **Mark as Sold/Rented** 🆕 | One-click property status change with appointment cancellation | Admin, Agent |
+| **Sales Tracking** 🆕 | Track who sold each property for commission purposes | Admin, Agent |
+| **Archive System** 🆕 | Archive sold/rented properties to clean up listings | Admin, Agent |
 
 ### 📅 Booking System (Second-Level Precision)
 | Feature | Description |
