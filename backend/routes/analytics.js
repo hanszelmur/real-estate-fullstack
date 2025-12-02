@@ -9,6 +9,7 @@
  * ## Endpoints
  * 
  * - GET /api/analytics/summary - Get dashboard overview statistics
+ * - GET /api/analytics/sales - Get sales report with by-agent breakdown
  * - GET /api/analytics/sales-trends - Get sales trends over time
  * - GET /api/analytics/top-agents - Get top performing agents
  * - GET /api/analytics/booking-trends - Get booking trends over time
@@ -215,6 +216,118 @@ router.get('/top-agents', authenticate, requireRole('admin'), async (req, res) =
         res.status(500).json({
             success: false,
             error: 'Failed to fetch top agents.'
+        });
+    }
+});
+
+/**
+ * GET /api/analytics/sales
+ * Get sales report with detailed breakdown
+ * 
+ * @queryparam {number} agentId - Filter by sold_by_agent_id (optional)
+ * @queryparam {string} startDate - Filter from date (YYYY-MM-DD, optional)
+ * @queryparam {string} endDate - Filter to date (YYYY-MM-DD, optional)
+ * 
+ * @returns {Object} Sales report
+ * @returns {Array} sales - Individual sale records
+ * @returns {Object} summary - Aggregated statistics
+ */
+router.get('/sales', authenticate, requireRole('admin'), async (req, res) => {
+    try {
+        const { agentId, startDate, endDate } = req.query;
+        
+        // Build WHERE clause for filtering
+        let whereClause = "WHERE p.status IN ('sold', 'rented')";
+        const params = [];
+        
+        if (agentId) {
+            whereClause += ' AND p.sold_by_agent_id = ?';
+            params.push(parseInt(agentId));
+        }
+        
+        if (startDate) {
+            whereClause += ' AND p.sold_date >= ?';
+            params.push(startDate);
+        }
+        
+        if (endDate) {
+            whereClause += ' AND p.sold_date <= ?';
+            params.push(endDate + ' 23:59:59');
+        }
+        
+        // Get individual sales with agent info
+        const sales = await db.query(`
+            SELECT 
+                p.id as property_id,
+                p.title,
+                p.sold_date,
+                p.price as sold_price,
+                CONCAT(u.first_name, ' ', u.last_name) as agent_name,
+                p.sold_by_agent_id as agent_id,
+                p.status
+            FROM properties p
+            LEFT JOIN users u ON p.sold_by_agent_id = u.id
+            ${whereClause}
+            ORDER BY p.sold_date DESC
+        `, params);
+        
+        // Get total sales count and value
+        const summaryResult = await db.query(`
+            SELECT 
+                COUNT(*) as total_sales,
+                COALESCE(SUM(p.price), 0) as total_value
+            FROM properties p
+            ${whereClause}
+        `, params);
+        
+        // Get breakdown by agent
+        const byAgentResult = await db.query(`
+            SELECT 
+                p.sold_by_agent_id as agent_id,
+                CONCAT(u.first_name, ' ', u.last_name) as agent_name,
+                COUNT(*) as count,
+                COALESCE(SUM(p.price), 0) as total_value
+            FROM properties p
+            LEFT JOIN users u ON p.sold_by_agent_id = u.id
+            ${whereClause}
+            AND p.sold_by_agent_id IS NOT NULL
+            GROUP BY p.sold_by_agent_id
+            ORDER BY total_value DESC
+        `, params);
+        
+        // Build by_agent object
+        const byAgent = {};
+        byAgentResult.forEach(row => {
+            byAgent[row.agent_id] = {
+                name: row.agent_name,
+                count: row.count,
+                total_value: parseFloat(row.total_value) || 0
+            };
+        });
+        
+        res.json({
+            success: true,
+            sales: sales.map(s => ({
+                property_id: s.property_id,
+                title: s.title,
+                sold_date: s.sold_date,
+                sold_price: parseFloat(s.sold_price) || 0,
+                agent_name: s.agent_name,
+                agent_id: s.agent_id,
+                status: s.status
+            })),
+            summary: {
+                total_sales: summaryResult[0].total_sales,
+                total_value: parseFloat(summaryResult[0].total_value) || 0,
+                by_agent: byAgent
+            }
+        });
+        
+    } catch (error) {
+        console.error('Get sales analytics error:', error);
+        res.status(500).json({
+            success: false,
+            error: 'Failed to fetch sales analytics.'
         });
     }
 });
