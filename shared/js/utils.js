@@ -249,6 +249,62 @@ function showToast(message, type = 'info', duration = 3000) {
 }
 
 /**
+ * Capitalize first letter of a string
+ * 
+ * @param {string} str - String to capitalize
+ * @returns {string} String with first letter capitalized
+ * 
+ * @example
+ * capitalize('pending'); // Returns: 'Pending'
+ */
+function capitalize(str) {
+    if (!str) return '';
+    return str.charAt(0).toUpperCase() + str.slice(1);
+}
+
+/**
+ * Capitalize first letter of a string
+ * (Alternative naming for the capitalize function)
+ * 
+ * @param {string} str - String to capitalize
+ * @returns {string} String with first letter capitalized
+ * 
+ * @example
+ * capitalizeFirst('house'); // Returns: 'House'
+ */
+function capitalizeFirst(str) {
+    return capitalize(str);
+}
+
+/**
+ * Get status badge CSS class based on status value
+ * 
+ * @param {string} status - Status value (e.g., 'available', 'pending', 'sold')
+ * @returns {string} CSS class for the badge
+ * 
+ * @example
+ * getStatusBadgeColor('available'); // Returns: 'badge-success'
+ * getStatusBadgeColor('pending'); // Returns: 'badge-warning'
+ */
+function getStatusBadgeColor(status) {
+    switch (status) {
+        case 'available':
+        case 'confirmed':
+        case 'completed':
+            return 'badge-success';
+        case 'pending':
+            return 'badge-warning';
+        case 'sold':
+        case 'rented':
+            return 'badge-info';
+        case 'cancelled':
+            return 'badge-danger';
+        default:
+            return 'badge-secondary';
+    }
+}
+
+/**
  * Export for use in Node.js test environment (if needed)
  */
 if (typeof module !== 'undefined' && module.exports) {
@@ -264,7 +320,10 @@ if (typeof module !== 'undefined' && module.exports) {
         debounce,
         getQueryParam,
         createStatusBadge,
-        showToast
+        showToast,
+        capitalize,
+        capitalizeFirst,
+        getStatusBadgeColor
     };
 }
 

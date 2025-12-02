@@ -2,19 +2,10 @@
  * Main App JavaScript
  * 
  * Handles home page functionality including featured properties.
+ * 
+ * Note: Utility functions (escapeHtml, formatPrice, formatNumber, etc.)
+ * are provided by ../shared/js/utils.js
  */
-
-/**
- * Escape HTML special characters to prevent XSS
- * @param {string} str - String to escape
- * @returns {string} - Escaped string
- */
-function escapeHtml(str) {
-    if (!str) return '';
-    const div = document.createElement('div');
-    div.textContent = str;
-    return div.innerHTML;
-}
 
 document.addEventListener('DOMContentLoaded', () => {
     loadFeaturedProperties();
@@ -119,17 +110,3 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 });
-
-/**
- * Format price with commas
- */
-function formatPrice(price) {
-    return Number(price).toLocaleString('en-US', { maximumFractionDigits: 0 });
-}
-
-/**
- * Format number with commas
- */
-function formatNumber(num) {
-    return Number(num).toLocaleString('en-US');
-}

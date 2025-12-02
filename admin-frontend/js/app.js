@@ -1,5 +1,8 @@
 /**
  * Admin Dashboard Main Application
+ * 
+ * Note: Utility functions (escapeHtml, formatPrice, formatNumber, formatDate, formatTime, capitalize, getStatusBadgeColor, etc.)
+ * are provided by ../shared/js/utils.js
  */
 
 let usersData = [];
@@ -292,6 +295,8 @@ async function loadProperties() {
                 <td>${escapeHtml(p.city)}, ${escapeHtml(p.state)}</td>
                 <td>$${formatPrice(p.price)}${p.listing_type === 'rent' ? '/mo' : ''}</td>
                 <td>${capitalize(p.property_type)}</td>
+                <td><span class="badge ${getStatusBadgeColor(p.status)}">${capitalize(p.status)}</span></td>
+                <td>${p.agent_first_name ? `${p.agent_first_name} ${p.agent_last_name}` : '-'}</td>
                 <td><span class="badge ${getStatusBadge(p.status)}">${capitalize(p.status)}</span></td>
                 <td>${p.agent_first_name ? `${escapeHtml(p.agent_first_name)} ${escapeHtml(p.agent_last_name)}` : '-'}</td>
                 <td>
@@ -525,16 +530,6 @@ function setupImagePreview() {
     }
 }
 
-/**
- * Escape HTML for display
- */
-function escapeHtml(str) {
-    if (!str) return '';
-    const div = document.createElement('div');
-    div.textContent = str;
-    return div.innerHTML;
-}
-
 async function deleteProperty(propertyId) {
     if (!confirm('Are you sure you want to delete this property? This action cannot be undone.')) {
         return;
@@ -574,7 +569,7 @@ async function loadAppointments() {
                 <td>${escapeHtml(a.customer_first_name)} ${escapeHtml(a.customer_last_name)}</td>
                 <td>${a.agent_first_name ? `${escapeHtml(a.agent_first_name)} ${escapeHtml(a.agent_last_name)}` : '-'}</td>
                 <td>${formatDate(a.appointment_date)} ${formatTime(a.appointment_time)}</td>
-                <td><span class="badge ${getStatusBadge(a.status)}">${capitalize(a.status)}</span></td>
+                <td><span class="badge ${getStatusBadgeColor(a.status)}">${capitalize(a.status)}</span></td>
                 <td>
                     <button class="btn btn-sm btn-primary" onclick="editAppointment(${a.id})">Edit</button>
                     <button class="btn btn-sm btn-danger" onclick="deleteAppointment(${a.id})">Delete</button>
@@ -651,43 +646,6 @@ function closeModal(modalId) {
     document.getElementById(modalId).classList.remove('active');
 }
 
-/**
- * Utilities
- */
-function formatPrice(price) {
-    return Number(price).toLocaleString('en-US', { maximumFractionDigits: 0 });
-}
-
-function formatDate(dateStr) {
-    return new Date(dateStr).toLocaleDateString('en-US', {
-        year: 'numeric',
-        month: 'short',
-        day: 'numeric'
-    });
-}
-
-function formatTime(timeStr) {
-    const [hours, minutes] = timeStr.split(':');
-    const hour = parseInt(hours);
-    const ampm = hour >= 12 ? 'PM' : 'AM';
-    const hour12 = hour % 12 || 12;
-    return `${hour12}:${minutes} ${ampm}`;
-}
-
-function capitalize(str) {
-    return str.charAt(0).toUpperCase() + str.slice(1);
-}
-
-function getStatusBadge(status) {
-    switch (status) {
-        case 'available': case 'confirmed': case 'completed': return 'badge-success';
-        case 'pending': return 'badge-warning';
-        case 'sold': case 'rented': return 'badge-info';
-        case 'cancelled': return 'badge-danger';
-        default: return 'badge-secondary';
-    }
-}
-
 // ============================================================================
 // SALES TRACKING FUNCTIONS
 // ============================================================================
@@ -730,6 +688,9 @@ async function loadSalesReport() {
                 <td>${escapeHtml(p.title)}</td>
                 <td>${escapeHtml(p.address)}, ${escapeHtml(p.city)}</td>
                 <td>$${formatPrice(p.price)}</td>
+                <td>${p.agent_first_name ? `${p.agent_first_name} ${p.agent_last_name}` : '-'}</td>
+                <td>${p.sold_by_first_name ? `${p.sold_by_first_name} ${p.sold_by_last_name}` : '-'}</td>
+                <td><span class="badge ${getStatusBadgeColor(p.status)}">${capitalize(p.status)}</span></td>
                 <td>${p.agent_first_name ? `${escapeHtml(p.agent_first_name)} ${escapeHtml(p.agent_last_name)}` : '-'}</td>
                 <td>${p.sold_by_first_name ? `${escapeHtml(p.sold_by_first_name)} ${escapeHtml(p.sold_by_last_name)}` : '-'}</td>
                 <td><span class="badge ${getStatusBadge(p.status)}">${capitalize(p.status)}</span></td>
@@ -822,7 +783,7 @@ async function loadArchivedProperties() {
                 <td>${escapeHtml(p.title)}</td>
                 <td>${escapeHtml(p.address)}, ${escapeHtml(p.city)}</td>
                 <td>$${formatPrice(p.price)}</td>
-                <td><span class="badge ${getStatusBadge(p.status)}">${capitalize(p.status)}</span></td>
+                <td><span class="badge ${getStatusBadgeColor(p.status)}">${capitalize(p.status)}</span></td>
                 <td>${p.sold_date ? formatDate(p.sold_date) : '-'}</td>
                 <td>
                     <button class="btn btn-sm btn-primary" onclick="unarchiveProperty(${p.id})">Unarchive</button>
