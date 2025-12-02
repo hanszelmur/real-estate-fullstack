@@ -15,6 +15,7 @@
 -- Stores all users: customers, agents, and admins
 -- role: 'customer', 'agent', 'admin'
 -- is_verified: customers must verify their phone before they can log in
+-- deleted_at: soft delete timestamp (NULL if not deleted)
 -- ============================================================================
 CREATE TABLE IF NOT EXISTS users (
     id INT AUTO_INCREMENT PRIMARY KEY,
@@ -26,11 +27,13 @@ CREATE TABLE IF NOT EXISTS users (
     role ENUM('customer', 'agent', 'admin') NOT NULL DEFAULT 'customer',
     is_verified BOOLEAN DEFAULT FALSE,
     is_active BOOLEAN DEFAULT TRUE,
+    deleted_at TIMESTAMP NULL DEFAULT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     INDEX idx_email (email),
     INDEX idx_role (role),
-    INDEX idx_phone (phone)
+    INDEX idx_phone (phone),
+    INDEX idx_deleted_at (deleted_at)
 );
 
 -- ============================================================================
@@ -63,6 +66,7 @@ CREATE TABLE IF NOT EXISTS verifications (
 -- sold_by_agent_id: Agent who closed the sale (for commission tracking)
 -- sold_date: When the sale was recorded
 -- is_archived: Soft delete for reporting (hides from customer listings)
+-- deleted_at: soft delete timestamp (NULL if not deleted)
 -- ============================================================================
 CREATE TABLE IF NOT EXISTS properties (
     id INT AUTO_INCREMENT PRIMARY KEY,
@@ -88,6 +92,7 @@ CREATE TABLE IF NOT EXISTS properties (
     sold_by_agent_id INT,
     sold_date DATETIME,
     is_archived BOOLEAN DEFAULT FALSE,
+    deleted_at TIMESTAMP NULL DEFAULT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     INDEX idx_status (status),
@@ -98,6 +103,7 @@ CREATE TABLE IF NOT EXISTS properties (
     INDEX idx_sold_by_agent (sold_by_agent_id),
     INDEX idx_sold_date (sold_date),
     INDEX idx_is_archived (is_archived),
+    INDEX idx_deleted_at (deleted_at),
     FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE SET NULL,
     FOREIGN KEY (assigned_agent_id) REFERENCES users(id) ON DELETE SET NULL,
     FOREIGN KEY (sold_by_agent_id) REFERENCES users(id) ON DELETE SET NULL

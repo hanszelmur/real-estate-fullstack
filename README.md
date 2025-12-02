@@ -1944,16 +1944,108 @@ This section provides a critical analysis of the platform's design decisions, tr
 - ✅ SQL injection prevention (parameterized queries)
 - ✅ XSS prevention (HTML escaping in frontend)
 - ✅ CORS restricted to known frontend origins
+- ✅ Rate limiting on authentication endpoints
+- ✅ Database transactions with row locking for queue operations
 
 ### Production Recommendations
 - ⚠️ Replace Base64 tokens with signed JWTs
 - ⚠️ Implement HTTPS everywhere
-- ⚠️ Add request rate limiting
 - ⚠️ Implement CSRF protection
-- ⚠️ Add input validation library
 - ⚠️ Set secure cookie flags
 - ⚠️ Implement proper session management
 - ⚠️ Change all demo credentials before deployment
+
+### Setting Up HTTPS
+
+#### Development (Self-Signed Certificate)
+
+For local development with HTTPS:
+
+```bash
+# Generate self-signed certificate (valid for 365 days)
+openssl req -x509 -newkey rsa:4096 -keyout key.pem -out cert.pem -days 365 -nodes
+
+# When prompted, fill in the certificate details (can use defaults for development)
+```
+
+Then configure your Node.js server to use HTTPS:
+
+```javascript
+const https = require('https');
+const fs = require('fs');
+const app = require('./server');
+
+const options = {
+    key: fs.readFileSync('key.pem'),
+    cert: fs.readFileSync('cert.pem')
+};
+
+https.createServer(options, app).listen(3443, () => {
+    console.log('HTTPS server running on port 3443');
+});
+```
+
+#### Production (Let's Encrypt with Nginx)
+
+For production deployments, use Let's Encrypt for free SSL certificates:
+
+```bash
+# Install Certbot
+sudo apt update
+sudo apt install certbot python3-certbot-nginx
+
+# Obtain certificate (replace yourdomain.com with your actual domain)
+sudo certbot --nginx -d yourdomain.com -d www.yourdomain.com
+
+# Certificate auto-renewal is set up automatically
+# Test renewal with:
+sudo certbot renew --dry-run
+```
+
+Example Nginx configuration for HTTPS:
+
+```nginx
+server {
+    listen 80;
+    server_name yourdomain.com www.yourdomain.com;
+    return 301 https://$server_name$request_uri;
+}
+
+server {
+    listen 443 ssl http2;
+    server_name yourdomain.com www.yourdomain.com;
+
+    ssl_certificate /etc/letsencrypt/live/yourdomain.com/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/yourdomain.com/privkey.pem;
+    
+    # Security headers
+    add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
+    add_header X-Frame-Options "SAMEORIGIN" always;
+    add_header X-Content-Type-Options "nosniff" always;
+    add_header X-XSS-Protection "1; mode=block" always;
+
+    # API proxy
+    location /api {
+        proxy_pass http://localhost:3000;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection 'upgrade';
+        proxy_set_header Host $host;
+        proxy_cache_bypass $http_upgrade;
+    }
+
+    # Uploaded images
+    location /uploads {
+        proxy_pass http://localhost:3000;
+    }
+
+    # Customer frontend
+    location / {
+        root /var/www/customer-frontend;
+        try_files $uri $uri/ /index.html;
+    }
+}
+```
 
 ### Demo Credentials (Change Before Production!)
 ```
