@@ -56,6 +56,7 @@ const router = express.Router();
 const db = require('../config/database');
 const { authenticate, requireRole, requireVerified } = require('../middleware/auth');
 const auditLogger = require('../utils/auditLogger');
+const logger = require('../utils/logger');
 
 /**
  * Promote the next queued customer for a slot when a booking is cancelled
@@ -83,7 +84,7 @@ const auditLogger = require('../utils/auditLogger');
  */
 async function promoteNextInQueue(propertyId, appointmentDate, appointmentTime) {
     // Log the promotion attempt
-    console.log(`[QUEUE] Checking for queued bookings: property=${propertyId}, date=${appointmentDate}, time=${appointmentTime}`);
+    logger.info('Checking for queued bookings', { propertyId, appointmentDate, appointmentTime });
     
     // Find the next queued customer for this slot
     // ORDER BY queue_position ASC ensures we get position 1 first
@@ -103,7 +104,7 @@ async function promoteNextInQueue(propertyId, appointmentDate, appointmentTime) 
         const nextInQueue = queuedBookings[0];
         
         // Log the promotion event
-        console.log(`[QUEUE] Promoting customer ${nextInQueue.customer_id} from position ${nextInQueue.queue_position}`);
+        logger.info('Promoting customer from queue', { customerId: nextInQueue.customer_id, queuePosition: nextInQueue.queue_position });
         
         // Promote to confirmed status
         // Clear queue_position as they're no longer in the queue
@@ -145,12 +146,12 @@ async function promoteNextInQueue(propertyId, appointmentDate, appointmentTime) 
             reason: 'Previous booking cancelled'
         });
         
-        console.log(`[QUEUE] Successfully promoted customer ${nextInQueue.customer_id} to confirmed status`);
+        logger.info('Successfully promoted customer to confirmed status', { customerId: nextInQueue.customer_id });
         
         return nextInQueue;
     }
     
-    console.log(`[QUEUE] No queued bookings found for this slot`);
+    logger.info('No queued bookings found for this slot', { propertyId, appointmentDate, appointmentTime });
     return null;
 }
 
@@ -246,7 +247,7 @@ router.get('/', authenticate, async (req, res) => {
         });
         
     } catch (error) {
-        console.error('List appointments error:', error);
+        logger.error('List appointments error', { error: error.message, stack: error.stack });
         res.status(500).json({
             success: false,
             error: 'Failed to fetch appointments.'
@@ -476,7 +477,7 @@ router.post('/', authenticate, requireVerified, async (req, res) => {
         }
         
         // Log the booking attempt
-        console.log(`[BOOKING] Customer ${user.id} attempting to book: property=${propertyId}, date=${appointmentDate}, time=${appointmentTime}`);
+        logger.info('Customer attempting to book', { userId: user.id, propertyId, appointmentDate, appointmentTime });
         
         // Check if property exists and is available
         const properties = await db.query(
@@ -500,7 +501,7 @@ router.post('/', authenticate, requireVerified, async (req, res) => {
         `, [propertyId, appointmentDate, appointmentTime]);
         
         if (blockedSlots.length > 0) {
-            console.log(`[BOOKING] Slot is blocked: property=${propertyId}, date=${appointmentDate}, time=${appointmentTime}`);
+            logger.info('Slot is blocked', { propertyId, appointmentDate, appointmentTime });
             return res.status(409).json({
                 success: false,
                 error: 'This time slot is not available. Please select a different time.'
@@ -515,7 +516,7 @@ router.post('/', authenticate, requireVerified, async (req, res) => {
         `, [propertyId, user.id]);
         
         if (existingCustomerBookings.length > 0) {
-            console.log(`[BOOKING] Customer ${user.id} already has booking for property ${propertyId}`);
+            logger.info('Customer already has booking for property', { userId: user.id, propertyId });
             return res.status(409).json({
                 success: false,
                 error: 'You already have a pending, confirmed, or queued appointment for this property.'
@@ -536,7 +537,7 @@ router.post('/', authenticate, requireVerified, async (req, res) => {
         const timePart = isoString.slice(11, 23); // 10:30:45.123
         const bookingTimestamp = `${datePart} ${timePart}000`; // Add microseconds (000)
         
-        console.log(`[BOOKING] Booking timestamp: ${bookingTimestamp}`);
+        logger.debug('Booking timestamp', { bookingTimestamp });
         
         // Check if slot is already confirmed/pending (someone else got there first)
         const existingConfirmedBookings = await db.query(`
@@ -561,7 +562,7 @@ router.post('/', authenticate, requireVerified, async (req, res) => {
             status = 'queued';
             
             // Log the race condition / collision
-            console.log(`[BOOKING] SLOT COLLISION: Slot already taken, adding customer ${user.id} to queue`);
+            logger.info('Slot collision - adding customer to queue', { userId: user.id });
             
             // Get current max queue position for this slot
             // New bookings go to the end of the queue
@@ -617,7 +618,7 @@ router.post('/', authenticate, requireVerified, async (req, res) => {
                 `New viewing request for ${property.title} on ${appointmentDate} at ${appointmentTime}.`
             ]);
             
-            console.log(`[NOTIFICATION] Sent to agent ${property.assigned_agent_id} about new appointment`);
+            logger.info('Notification sent to agent', { agentId: property.assigned_agent_id });
         }
         
         // Fetch the created appointment with property details
@@ -630,7 +631,7 @@ router.post('/', authenticate, requireVerified, async (req, res) => {
             WHERE a.id = ?
         `, [result.insertId]);
         
-        console.log(`[BOOKING] Successfully created appointment ${result.insertId}, status=${status}, queued=${isQueued}`);
+        logger.info('Appointment created', { appointmentId: result.insertId, status, isQueued });
         
         res.status(201).json({
             success: true,
@@ -691,7 +692,7 @@ router.put('/:id', authenticate, async (req, res) => {
         const { status, appointmentDate, appointmentTime, notes } = req.body;
         const user = req.user;
         
-        console.log(`[APPOINTMENT] Update request: id=${id}, status=${status}, by user=${user.id} (${user.role})`);
+        logger.info('Appointment update request', { appointmentId: id, status, userId: user.id, userRole: user.role });
         
         // Get existing appointment
         const appointments = await db.query(`
@@ -774,7 +775,7 @@ router.put('/:id', authenticate, async (req, res) => {
         const oldStatus = appointment.status;
         const newStatus = status || appointment.status;
         
-        console.log(`[APPOINTMENT] Status change: ${oldStatus} -> ${newStatus}`);
+        logger.info('Appointment status change', { oldStatus, newStatus });
         
         // Use transaction for cancellation with queue promotion
         const needsTransaction = newStatus === 'cancelled' && ['pending', 'confirmed'].includes(oldStatus);
@@ -836,7 +837,7 @@ router.put('/:id', authenticate, async (req, res) => {
             
             if (queuedBookings.length > 0) {
                 const nextInQueue = queuedBookings[0];
-                console.log(`[QUEUE] Promoting customer ${nextInQueue.customer_id} from position ${nextInQueue.queue_position}`);
+                logger.info('Promoting customer from queue', { customerId: nextInQueue.customer_id, queuePosition: nextInQueue.queue_position });
                 
                 // Promote to confirmed status
                 await new Promise((resolve, reject) => {
@@ -930,7 +931,7 @@ router.put('/:id', authenticate, async (req, res) => {
                 VALUES (?, 'appointment', ?, ?)
             `, [appointment.customer_id, notificationTitle, notificationMessage]);
             
-            console.log(`[NOTIFICATION] Sent status update to customer ${appointment.customer_id}`);
+            logger.info('Notification sent to customer', { customerId: appointment.customer_id });
             
             // Notify agent of cancellation by customer
             if (status === 'cancelled' && appointment.agent_id && user.id === appointment.customer_id) {
@@ -1008,7 +1009,7 @@ router.delete('/:id', authenticate, requireRole('admin'), async (req, res) => {
         });
         
     } catch (error) {
-        console.error('Delete appointment error:', error);
+        logger.error('Delete appointment error', { error: error.message, stack: error.stack });
         res.status(500).json({
             success: false,
             error: 'Failed to delete appointment.'
