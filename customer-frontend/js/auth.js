@@ -21,6 +21,7 @@ function updateAuthUI() {
     const registerLink = document.getElementById('registerLink');
     const logoutLink = document.getElementById('logoutLink');
     const appointmentsLink = document.getElementById('appointmentsLink');
+    const messagesLink = document.getElementById('messagesLink');
     const userInfo = document.getElementById('userInfo');
     const userName = document.getElementById('userName');
     
@@ -32,15 +33,45 @@ function updateAuthUI() {
         if (registerLink) registerLink.classList.add('hidden');
         if (logoutLink) logoutLink.classList.remove('hidden');
         if (appointmentsLink) appointmentsLink.classList.remove('hidden');
+        if (messagesLink) messagesLink.classList.remove('hidden');
         if (userInfo) userInfo.classList.remove('hidden');
         if (userName) userName.textContent = `${user.firstName} ${user.lastName}`;
+        
+        // Load unread message count
+        loadUnreadMessageCount();
     } else {
         // Show logged-out state
         if (loginLink) loginLink.classList.remove('hidden');
         if (registerLink) registerLink.classList.remove('hidden');
         if (logoutLink) logoutLink.classList.add('hidden');
         if (appointmentsLink) appointmentsLink.classList.add('hidden');
+        if (messagesLink) messagesLink.classList.add('hidden');
         if (userInfo) userInfo.classList.add('hidden');
+    }
+}
+
+/**
+ * Load unread message count for badge
+ */
+async function loadUnreadMessageCount() {
+    if (typeof API === 'undefined') return;
+    
+    try {
+        const response = await API.get('/messages/inbox?unread=true&limit=1');
+        if (response.ok && response.data.success) {
+            const unreadCount = response.data.unreadCount || 0;
+            const badge = document.getElementById('unreadBadge');
+            if (badge) {
+                if (unreadCount > 0) {
+                    badge.textContent = unreadCount;
+                    badge.classList.remove('hidden');
+                } else {
+                    badge.classList.add('hidden');
+                }
+            }
+        }
+    } catch (error) {
+        // Silently fail - badge just won't show
     }
 }
 

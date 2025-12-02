@@ -44,6 +44,7 @@
                 <a href="#" class="nav-item" data-page="sales">💰 Sales Report</a>
                 <a href="#" class="nav-item" data-page="archived">📦 Archived</a>
                 <a href="#" class="nav-item" data-page="appointments">📅 Appointments</a>
+                <a href="#" class="nav-item" data-page="messages">✉️ Messages <span class="badge-count hidden" id="unreadBadge">0</span></a>
             </nav>
             <div class="sidebar-footer">
                 <span id="adminName"></span>
@@ -308,10 +309,136 @@
                     </table>
                 </div>
             </div>
+
+            <!-- Messages Page -->
+            <div class="page" id="messagesPage">
+                <div class="page-header">
+                    <h1>Messages</h1>
+                    <button class="btn btn-success" onclick="showBroadcastModal()">📢 Broadcast Message</button>
+                </div>
+                
+                <div class="messages-container">
+                    <div class="messages-sidebar">
+                        <button class="btn btn-primary btn-full" onclick="showComposeModal()">✉️ Compose New</button>
+                        <div class="messages-tabs">
+                            <button class="messages-tab active" onclick="switchMessageTab('inbox')">
+                                📥 Inbox <span class="tab-badge hidden" id="inboxBadge">0</span>
+                            </button>
+                            <button class="messages-tab" onclick="switchMessageTab('sent')">
+                                📤 Sent
+                            </button>
+                        </div>
+                        <div class="messages-filter-section">
+                            <h4>Search & Filter</h4>
+                            <input type="text" id="messageSearch" placeholder="Search messages..." oninput="filterMessages()">
+                            <select id="messageRoleFilter" onchange="filterMessages()">
+                                <option value="">All Roles</option>
+                                <option value="customer">Customers</option>
+                                <option value="agent">Agents</option>
+                                <option value="admin">Admins</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="messages-main">
+                        <div class="messages-list" id="messagesList">
+                            <div class="loading">Loading messages...</div>
+                        </div>
+                        <div class="pagination hidden" id="messagesPagination">
+                            <button class="btn btn-secondary btn-sm" onclick="changeMessagePage(-1)" id="prevMsgPage">Previous</button>
+                            <span id="msgPageInfo">Page 1</span>
+                            <button class="btn btn-secondary btn-sm" onclick="changeMessagePage(1)" id="nextMsgPage">Next</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
         </main>
     </div>
 
-    <!-- Edit User Modal -->
+    <!-- Compose Message Modal -->
+    <div class="modal" id="composeModal">
+        <div class="modal-content">
+            <span class="close" onclick="closeModal('composeModal')">&times;</span>
+            <h2>✉️ New Message</h2>
+            <form id="composeForm" onsubmit="sendMessage(event)">
+                <div class="form-group">
+                    <label for="recipientSelect">To:</label>
+                    <select id="recipientSelect" required>
+                        <option value="">-- Select recipient --</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="messageSubject">Subject:</label>
+                    <input type="text" id="messageSubject" required placeholder="Enter subject">
+                </div>
+                <div class="form-group">
+                    <label for="messageBody">Message:</label>
+                    <textarea id="messageBody" rows="6" required placeholder="Write your message..."></textarea>
+                </div>
+                <div class="error-message hidden" id="composeError"></div>
+                <div class="success-message hidden" id="composeSuccess"></div>
+                <button type="submit" class="btn btn-primary btn-full">Send Message</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- View Message Modal -->
+    <div class="modal" id="viewModal">
+        <div class="modal-content modal-lg">
+            <span class="close" onclick="closeModal('viewModal')">&times;</span>
+            <div id="viewMessageContent">
+            </div>
+        </div>
+    </div>
+
+    <!-- Reply Modal -->
+    <div class="modal" id="replyModal">
+        <div class="modal-content">
+            <span class="close" onclick="closeModal('replyModal')">&times;</span>
+            <h2>↩️ Reply</h2>
+            <p class="reply-context" id="replyContext"></p>
+            <form id="replyForm" onsubmit="sendReply(event)">
+                <input type="hidden" id="replyParentId">
+                <div class="form-group">
+                    <label for="replyBody">Your Reply:</label>
+                    <textarea id="replyBody" rows="6" required placeholder="Write your reply..."></textarea>
+                </div>
+                <div class="error-message hidden" id="replyError"></div>
+                <div class="success-message hidden" id="replySuccess"></div>
+                <button type="submit" class="btn btn-primary btn-full">Send Reply</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Broadcast Message Modal -->
+    <div class="modal" id="broadcastModal">
+        <div class="modal-content">
+            <span class="close" onclick="closeModal('broadcastModal')">&times;</span>
+            <h2>📢 Broadcast Message</h2>
+            <p class="broadcast-info">Send a message to all users of a specific role.</p>
+            <form id="broadcastForm" onsubmit="sendBroadcast(event)">
+                <div class="form-group">
+                    <label for="broadcastRole">Send To:</label>
+                    <select id="broadcastRole" required>
+                        <option value="">-- Select audience --</option>
+                        <option value="customer">All Customers</option>
+                        <option value="agent">All Agents</option>
+                        <option value="all">All Users</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="broadcastSubject">Subject:</label>
+                    <input type="text" id="broadcastSubject" required placeholder="Enter subject">
+                </div>
+                <div class="form-group">
+                    <label for="broadcastBody">Message:</label>
+                    <textarea id="broadcastBody" rows="6" required placeholder="Write your broadcast message..."></textarea>
+                </div>
+                <div class="error-message hidden" id="broadcastError"></div>
+                <div class="success-message hidden" id="broadcastSuccess"></div>
+                <button type="submit" class="btn btn-success btn-full">📢 Send Broadcast</button>
+            </form>
+        </div>
+    </div>
     <div class="modal" id="userModal">
         <div class="modal-content">
             <span class="close" onclick="closeModal('userModal')">&times;</span>
@@ -538,5 +665,6 @@
     <script src="js/config.js"></script>
     <script src="../shared/js/api.js"></script>
     <script src="js/app.js"></script>
+    <script src="js/messages.js"></script>
 </body>
 </html>

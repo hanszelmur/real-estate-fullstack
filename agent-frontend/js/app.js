@@ -54,6 +54,11 @@ function showDashboard(user) {
     // Load initial data
     loadDashboardData();
     loadAgentRatingSummary();
+    
+    // Load unread message count
+    if (typeof loadUnreadCount === 'function') {
+        loadUnreadCount();
+    }
 }
 
 /**
@@ -143,6 +148,11 @@ function navigateTo(pageName) {
             break;
         case 'appointments':
             loadAppointments();
+            break;
+        case 'messages':
+            if (typeof initMessages === 'function') {
+                initMessages();
+            }
             break;
     }
 }

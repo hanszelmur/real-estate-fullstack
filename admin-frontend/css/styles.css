@@ -715,3 +715,379 @@ body {
     border: 1px solid #ddd;
     border-radius: 4px;
 }
+
+/* ============================================================================
+   Messaging System Styles
+   ============================================================================ */
+
+/* Messages Container Layout */
+.messages-container {
+    display: flex;
+    gap: 20px;
+    min-height: 500px;
+}
+
+.messages-sidebar {
+    width: 220px;
+    flex-shrink: 0;
+}
+
+.messages-main {
+    flex: 1;
+    background: white;
+    border-radius: 10px;
+    padding: 20px;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.08);
+}
+
+/* Messages Tabs */
+.messages-tabs {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    margin-top: 15px;
+}
+
+.messages-tab {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 15px;
+    background: white;
+    border: 1px solid #ddd;
+    border-radius: 5px;
+    cursor: pointer;
+    transition: all 0.3s;
+    text-align: left;
+    font-size: 0.95rem;
+}
+
+.messages-tab:hover {
+    border-color: #3498db;
+    background: #f8f9fa;
+}
+
+.messages-tab.active {
+    background: #3498db;
+    color: white;
+    border-color: #3498db;
+}
+
+.tab-badge {
+    background: #e74c3c;
+    color: white;
+    padding: 2px 8px;
+    border-radius: 10px;
+    font-size: 0.8rem;
+    font-weight: bold;
+}
+
+.messages-tab.active .tab-badge {
+    background: white;
+    color: #3498db;
+}
+
+/* Messages Filter Section */
+.messages-filter-section {
+    margin-top: 20px;
+    padding-top: 15px;
+    border-top: 1px solid #eee;
+}
+
+.messages-filter-section h4 {
+    font-size: 0.9rem;
+    color: #666;
+    margin-bottom: 10px;
+}
+
+.messages-filter-section input,
+.messages-filter-section select {
+    width: 100%;
+    padding: 8px 12px;
+    border: 1px solid #ddd;
+    border-radius: 5px;
+    font-size: 0.9rem;
+    margin-bottom: 10px;
+}
+
+/* Messages List */
+.messages-list {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+/* Message Card */
+.message-card {
+    padding: 15px;
+    background: #f8f9fa;
+    border-radius: 8px;
+    border-left: 4px solid #ddd;
+    cursor: pointer;
+    transition: all 0.3s;
+}
+
+.message-card:hover {
+    background: #eef2f7;
+    border-left-color: #3498db;
+}
+
+.message-card.unread {
+    background: #e3f2fd;
+    border-left-color: #2196f3;
+    font-weight: 500;
+}
+
+.message-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 8px;
+    flex-wrap: wrap;
+    gap: 5px;
+}
+
+.message-from {
+    color: #1a1a2e;
+    font-size: 0.95rem;
+}
+
+.message-from strong {
+    font-weight: 600;
+}
+
+.message-card.unread .message-from {
+    color: #1565c0;
+}
+
+.message-date {
+    color: #666;
+    font-size: 0.85rem;
+}
+
+.message-subject {
+    color: #333;
+    font-weight: 600;
+    margin-bottom: 5px;
+    font-size: 1rem;
+}
+
+.message-preview {
+    color: #666;
+    font-size: 0.9rem;
+    line-height: 1.4;
+}
+
+.message-reply-indicator {
+    display: inline-block;
+    margin-top: 8px;
+    padding: 2px 8px;
+    background: #e8f4fc;
+    color: #1976d2;
+    border-radius: 3px;
+    font-size: 0.8rem;
+}
+
+/* Role Badges */
+.role-badge {
+    font-size: 0.8rem;
+    padding: 2px 6px;
+    border-radius: 3px;
+}
+
+.role-badge.role-customer {
+    background: #e8f5e9;
+    color: #388e3c;
+}
+
+.role-badge.role-agent {
+    background: #e3f2fd;
+    color: #1976d2;
+}
+
+.role-badge.role-admin {
+    background: #fce4ec;
+    color: #c2185b;
+}
+
+/* Message Detail View */
+.message-detail h2 {
+    color: #1a1a2e;
+    margin-bottom: 15px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid #eee;
+}
+
+.message-meta {
+    background: #f8f9fa;
+    padding: 15px;
+    border-radius: 8px;
+    margin-bottom: 20px;
+}
+
+.message-meta p {
+    margin: 5px 0;
+    color: #555;
+    font-size: 0.95rem;
+}
+
+.message-body {
+    padding: 20px;
+    background: white;
+    border: 1px solid #eee;
+    border-radius: 8px;
+    line-height: 1.6;
+    color: #333;
+    margin-bottom: 20px;
+}
+
+/* Parent Message */
+.message-parent {
+    margin-bottom: 20px;
+    padding: 15px;
+    background: #fff8e1;
+    border-radius: 8px;
+    border-left: 4px solid #ffc107;
+}
+
+.message-parent h4 {
+    color: #e65100;
+    margin-bottom: 10px;
+    font-size: 0.9rem;
+}
+
+.parent-content {
+    background: white;
+    padding: 10px 15px;
+    border-radius: 5px;
+}
+
+.parent-meta {
+    color: #666;
+    font-size: 0.85rem;
+    margin-bottom: 8px;
+}
+
+/* Replies */
+.message-replies {
+    margin-top: 20px;
+}
+
+.message-replies h4 {
+    color: #1a1a2e;
+    margin-bottom: 15px;
+    font-size: 1rem;
+}
+
+.reply-item {
+    padding: 15px;
+    background: #f0f4f8;
+    border-radius: 8px;
+    margin-bottom: 10px;
+    border-left: 3px solid #3498db;
+}
+
+.reply-meta {
+    color: #666;
+    font-size: 0.85rem;
+    margin-bottom: 8px;
+    font-weight: 500;
+}
+
+.reply-body {
+    color: #333;
+    line-height: 1.5;
+}
+
+/* Message Actions */
+.message-actions {
+    display: flex;
+    gap: 10px;
+    margin-top: 20px;
+    padding-top: 15px;
+    border-top: 1px solid #eee;
+}
+
+/* Reply Context */
+.reply-context {
+    background: #f8f9fa;
+    padding: 12px 15px;
+    border-radius: 5px;
+    color: #555;
+    font-style: italic;
+    margin-bottom: 20px;
+    border-left: 3px solid #3498db;
+}
+
+/* Broadcast Info */
+.broadcast-info {
+    background: #fff3e0;
+    padding: 12px 15px;
+    border-radius: 5px;
+    color: #e65100;
+    margin-bottom: 20px;
+    border-left: 3px solid #f57c00;
+    font-size: 0.95rem;
+}
+
+/* Unread Badge in Nav */
+.badge-count {
+    background: #e74c3c;
+    color: white;
+    padding: 2px 6px;
+    border-radius: 10px;
+    font-size: 0.75rem;
+    font-weight: bold;
+    margin-left: 5px;
+}
+
+/* Modal Large */
+.modal-lg {
+    max-width: 700px;
+}
+
+/* Pagination */
+.pagination {
+    display: flex;
+    justify-content: center;
+    gap: 15px;
+    align-items: center;
+    margin-top: 20px;
+    padding-top: 15px;
+    border-top: 1px solid #eee;
+}
+
+/* Responsive Messages */
+@media (max-width: 768px) {
+    .messages-container {
+        flex-direction: column;
+    }
+    
+    .messages-sidebar {
+        width: 100%;
+    }
+    
+    .messages-tabs {
+        flex-direction: row;
+        flex-wrap: wrap;
+    }
+    
+    .messages-tab {
+        flex: 1;
+        min-width: 100px;
+        justify-content: center;
+    }
+    
+    .message-header {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+    
+    .message-actions {
+        flex-direction: column;
+    }
+    
+    .message-actions .btn {
+        width: 100%;
+    }
+}
