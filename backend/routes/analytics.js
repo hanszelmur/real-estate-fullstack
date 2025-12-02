@@ -236,13 +236,40 @@ router.get('/sales', authenticate, requireRole('admin'), async (req, res) => {
     try {
         const { agentId, startDate, endDate } = req.query;
         
+        // Validate agentId if provided
+        let parsedAgentId = null;
+        if (agentId) {
+            parsedAgentId = parseInt(agentId, 10);
+            if (isNaN(parsedAgentId) || parsedAgentId <= 0) {
+                return res.status(400).json({
+                    success: false,
+                    error: 'Invalid agentId parameter. Must be a positive integer.'
+                });
+            }
+        }
+        
+        // Validate date format (YYYY-MM-DD)
+        const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
+        if (startDate && !dateRegex.test(startDate)) {
+            return res.status(400).json({
+                success: false,
+                error: 'Invalid startDate format. Use YYYY-MM-DD.'
+            });
+        }
+        if (endDate && !dateRegex.test(endDate)) {
+            return res.status(400).json({
+                success: false,
+                error: 'Invalid endDate format. Use YYYY-MM-DD.'
+            });
+        }
+        
         // Build WHERE clause for filtering
         let whereClause = "WHERE p.status IN ('sold', 'rented')";
         const params = [];
         
-        if (agentId) {
+        if (parsedAgentId) {
             whereClause += ' AND p.sold_by_agent_id = ?';
-            params.push(parseInt(agentId));
+            params.push(parsedAgentId);
         }
         
         if (startDate) {
@@ -280,7 +307,9 @@ router.get('/sales', authenticate, requireRole('admin'), async (req, res) => {
             ${whereClause}
         `, params);
         
-        // Get breakdown by agent
+        // Get breakdown by agent (only for sales with assigned agents)
+        // Note: by_agent only includes sales where an agent was credited,
+        // so the sum may differ from total_value if some sales have no agent assigned
         const byAgentResult = await db.query(`
             SELECT 
                 p.sold_by_agent_id as agent_id,
