@@ -295,7 +295,7 @@ async function loadProperties() {
                 <td>${p.city}, ${p.state}</td>
                 <td>$${formatPrice(p.price)}${p.listing_type === 'rent' ? '/mo' : ''}</td>
                 <td>${capitalize(p.property_type)}</td>
-                <td><span class="badge ${getStatusBadge(p.status)}">${capitalize(p.status)}</span></td>
+                <td><span class="badge ${getStatusBadgeColor(p.status)}">${capitalize(p.status)}</span></td>
                 <td>${p.agent_first_name ? `${p.agent_first_name} ${p.agent_last_name}` : '-'}</td>
                 <td>
                     <button class="btn btn-sm btn-primary" onclick="editProperty(${p.id})">Edit</button>
@@ -567,7 +567,7 @@ async function loadAppointments() {
                 <td>${a.customer_first_name} ${a.customer_last_name}</td>
                 <td>${a.agent_first_name ? `${a.agent_first_name} ${a.agent_last_name}` : '-'}</td>
                 <td>${formatDate(a.appointment_date)} ${formatTime(a.appointment_time)}</td>
-                <td><span class="badge ${getStatusBadge(a.status)}">${capitalize(a.status)}</span></td>
+                <td><span class="badge ${getStatusBadgeColor(a.status)}">${capitalize(a.status)}</span></td>
                 <td>
                     <button class="btn btn-sm btn-primary" onclick="editAppointment(${a.id})">Edit</button>
                     <button class="btn btn-sm btn-danger" onclick="deleteAppointment(${a.id})">Delete</button>
@@ -644,13 +644,6 @@ function closeModal(modalId) {
     document.getElementById(modalId).classList.remove('active');
 }
 
-/**
- * Status badge helper - uses shared getStatusBadgeColor for consistency
- */
-function getStatusBadge(status) {
-    return getStatusBadgeColor(status);
-}
-
 // ============================================================================
 // SALES TRACKING FUNCTIONS
 // ============================================================================
@@ -695,7 +688,7 @@ async function loadSalesReport() {
                 <td>$${formatPrice(p.price)}</td>
                 <td>${p.agent_first_name ? `${p.agent_first_name} ${p.agent_last_name}` : '-'}</td>
                 <td>${p.sold_by_first_name ? `${p.sold_by_first_name} ${p.sold_by_last_name}` : '-'}</td>
-                <td><span class="badge ${getStatusBadge(p.status)}">${capitalize(p.status)}</span></td>
+                <td><span class="badge ${getStatusBadgeColor(p.status)}">${capitalize(p.status)}</span></td>
                 <td>${p.sold_date ? formatDate(p.sold_date) : '-'}</td>
             </tr>
         `).join('');
@@ -785,7 +778,7 @@ async function loadArchivedProperties() {
                 <td>${escapeHtml(p.title)}</td>
                 <td>${escapeHtml(p.address)}, ${escapeHtml(p.city)}</td>
                 <td>$${formatPrice(p.price)}</td>
-                <td><span class="badge ${getStatusBadge(p.status)}">${capitalize(p.status)}</span></td>
+                <td><span class="badge ${getStatusBadgeColor(p.status)}">${capitalize(p.status)}</span></td>
                 <td>${p.sold_date ? formatDate(p.sold_date) : '-'}</td>
                 <td>
                     <button class="btn btn-sm btn-primary" onclick="unarchiveProperty(${p.id})">Unarchive</button>

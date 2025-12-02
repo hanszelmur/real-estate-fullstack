@@ -263,7 +263,8 @@ function capitalize(str) {
 }
 
 /**
- * Alias for capitalize - capitalize first letter of a string
+ * Capitalize first letter of a string
+ * (Alternative naming for the capitalize function)
  * 
  * @param {string} str - String to capitalize
  * @returns {string} String with first letter capitalized
