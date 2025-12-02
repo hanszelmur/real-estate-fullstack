@@ -13,6 +13,7 @@
  */
 
 const mysql = require('mysql');
+const logger = require('../utils/logger');
 
 // Create a connection pool for better performance and connection management
 const pool = mysql.createPool({
@@ -40,7 +41,7 @@ const query = (sql, params = []) => {
     return new Promise((resolve, reject) => {
         pool.query(sql, params, (error, results) => {
             if (error) {
-                console.error('Database query error:', error.message);
+                logger.error('Database query error', { error: error.message });
                 reject(error);
             } else {
                 resolve(results);
@@ -57,7 +58,7 @@ const getConnection = () => {
     return new Promise((resolve, reject) => {
         pool.getConnection((error, connection) => {
             if (error) {
-                console.error('Database connection error:', error.message);
+                logger.error('Database connection error', { error: error.message });
                 reject(error);
             } else {
                 resolve(connection);
@@ -74,10 +75,10 @@ const testConnection = () => {
     return new Promise((resolve, reject) => {
         pool.getConnection((error, connection) => {
             if (error) {
-                console.error('Failed to connect to database:', error.message);
+                logger.error('Failed to connect to database', { error: error.message });
                 reject(error);
             } else {
-                console.log('✓ Database connection established successfully');
+                logger.info('Database connection established successfully');
                 connection.release();
                 resolve(true);
             }
@@ -95,7 +96,7 @@ const closePool = () => {
             if (error) {
                 reject(error);
             } else {
-                console.log('Database pool closed');
+                logger.info('Database pool closed');
                 resolve();
             }
         });

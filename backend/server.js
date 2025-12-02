@@ -21,6 +21,7 @@ const cors = require('cors');
 const path = require('path');
 const rateLimit = require('express-rate-limit');
 const db = require('./config/database');
+const logger = require('./utils/logger');
 
 // Import routes
 const authRoutes = require('./routes/auth');
@@ -67,8 +68,20 @@ app.use(express.urlencoded({ extended: true }));
 
 // Request logging middleware
 app.use((req, res, next) => {
-    const timestamp = new Date().toISOString();
-    console.log(`[${timestamp}] ${req.method} ${req.path}`);
+    const start = Date.now();
+    
+    res.on('finish', () => {
+        const duration = Date.now() - start;
+        logger.info('HTTP Request', {
+            method: req.method,
+            path: req.path,
+            status: res.statusCode,
+            duration: `${duration}ms`,
+            ip: req.ip,
+            userAgent: req.get('user-agent')
+        });
+    });
+    
     next();
 });
 
@@ -146,7 +159,12 @@ app.use((req, res) => {
 
 // Global error handler
 app.use((err, req, res, next) => {
-    console.error('Server error:', err);
+    logger.error('Server error', { 
+        error: err.message, 
+        stack: err.stack,
+        path: req.path,
+        method: req.method
+    });
     res.status(500).json({
         success: false,
         error: 'Internal server error'
@@ -160,69 +178,44 @@ app.use((err, req, res, next) => {
 const startServer = async () => {
     try {
         // Test database connection
-        console.log('\n🔌 Connecting to database...');
+        logger.info('Connecting to database...');
         await db.testConnection();
         
         // Start server
         app.listen(PORT, () => {
-            console.log('\n========================================');
-            console.log('🏠 Real Estate Backend Server');
-            console.log('========================================');
-            console.log(`✓ Server running on http://localhost:${PORT}`);
-            console.log(`✓ API endpoints available at http://localhost:${PORT}/api`);
-            console.log('========================================');
-            console.log('\nAvailable endpoints:');
-            console.log('  GET  /api/health');
-            console.log('  POST /api/auth/register');
-            console.log('  POST /api/auth/verify');
-            console.log('  POST /api/auth/resend-code');
-            console.log('  POST /api/auth/login');
-            console.log('  GET  /api/auth/me');
-            console.log('  GET  /api/properties');
-            console.log('  GET  /api/properties/featured');
-            console.log('  GET  /api/properties/:id');
-            console.log('  POST /api/properties');
-            console.log('  PUT  /api/properties/:id');
-            console.log('  DELETE /api/properties/:id');
-            console.log('  GET  /api/appointments');
-            console.log('  GET  /api/appointments/available-slots/:propertyId');
-            console.log('  GET  /api/appointments/:id');
-            console.log('  POST /api/appointments');
-            console.log('  PUT  /api/appointments/:id');
-            console.log('  DELETE /api/appointments/:id');
-            console.log('  GET  /api/users');
-            console.log('  GET  /api/users/agents');
-            console.log('  GET  /api/users/:id');
-            console.log('  PUT  /api/users/:id');
-            console.log('  GET  /api/notifications');
-            console.log('  PUT  /api/notifications/:id/read');
-            console.log('  PUT  /api/notifications/read-all');
-            console.log('  GET  /api/waitlist');
-            console.log('  POST /api/waitlist');
-            console.log('  DELETE /api/waitlist/:id');
-            console.log('  POST /api/ratings');
-            console.log('  GET  /api/ratings/agent/:agentId');
-            console.log('  GET  /api/ratings/agent/:agentId/summary');
-            console.log('  GET  /api/ratings/can-rate/:appointmentId');
-            console.log('========================================\n');
+            logger.info('Real Estate Backend Server started', {
+                port: PORT,
+                apiUrl: `http://localhost:${PORT}/api`
+            });
+            logger.info('Available endpoints', {
+                health: 'GET /api/health',
+                auth: ['POST /api/auth/register', 'POST /api/auth/verify', 'POST /api/auth/resend-code', 'POST /api/auth/login', 'GET /api/auth/me'],
+                properties: ['GET /api/properties', 'GET /api/properties/featured', 'GET /api/properties/:id', 'POST /api/properties', 'PUT /api/properties/:id', 'DELETE /api/properties/:id'],
+                appointments: ['GET /api/appointments', 'GET /api/appointments/available-slots/:propertyId', 'GET /api/appointments/:id', 'POST /api/appointments', 'PUT /api/appointments/:id', 'DELETE /api/appointments/:id'],
+                users: ['GET /api/users', 'GET /api/users/agents', 'GET /api/users/:id', 'PUT /api/users/:id'],
+                notifications: ['GET /api/notifications', 'PUT /api/notifications/:id/read', 'PUT /api/notifications/read-all'],
+                waitlist: ['GET /api/waitlist', 'POST /api/waitlist', 'DELETE /api/waitlist/:id'],
+                ratings: ['POST /api/ratings', 'GET /api/ratings/agent/:agentId', 'GET /api/ratings/agent/:agentId/summary', 'GET /api/ratings/can-rate/:appointmentId']
+            });
         });
     } catch (error) {
-        console.error('Failed to start server:', error.message);
-        console.log('\n⚠️  Make sure your database is running and configured correctly.');
-        console.log('Check your .env file for database credentials.\n');
+        logger.error('Failed to start server', { 
+            error: error.message,
+            hint: 'Make sure your database is running and configured correctly. Check your .env file for database credentials.'
+        });
         process.exit(1);
     }
 };
 
 // Handle graceful shutdown
 process.on('SIGINT', async () => {
-    console.log('\nShutting down server...');
+    logger.info('Shutting down server...');
     await db.closePool();
     process.exit(0);
 });
 
 process.on('SIGTERM', async () => {
-    console.log('\nShutting down server...');
+    logger.info('Shutting down server...');
     await db.closePool();
     process.exit(0);
 });
