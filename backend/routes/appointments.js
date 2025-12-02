@@ -85,73 +85,109 @@ async function promoteNextInQueue(propertyId, appointmentDate, appointmentTime) 
     // Log the promotion attempt
     console.log(`[QUEUE] Checking for queued bookings: property=${propertyId}, date=${appointmentDate}, time=${appointmentTime}`);
     
-    // Find the next queued customer for this slot
-    // ORDER BY queue_position ASC ensures we get position 1 first
-    const queuedBookings = await db.query(`
-        SELECT a.*, p.title as property_title
-        FROM appointments a
-        JOIN properties p ON a.property_id = p.id
-        WHERE a.property_id = ?
-          AND a.appointment_date = ?
-          AND a.appointment_time = ?
-          AND a.status = 'queued'
-        ORDER BY a.queue_position ASC
-        LIMIT 1
-    `, [propertyId, appointmentDate, appointmentTime]);
-    
-    if (queuedBookings.length > 0) {
-        const nextInQueue = queuedBookings[0];
-        
-        // Log the promotion event
-        console.log(`[QUEUE] Promoting customer ${nextInQueue.customer_id} from position ${nextInQueue.queue_position}`);
-        
-        // Promote to confirmed status
-        // Clear queue_position as they're no longer in the queue
-        await db.query(`
-            UPDATE appointments 
-            SET status = 'confirmed', queue_position = NULL 
-            WHERE id = ?
-        `, [nextInQueue.id]);
-        
-        // Update queue positions for remaining queued bookings
-        // Everyone moves up one position
-        await db.query(`
-            UPDATE appointments 
-            SET queue_position = queue_position - 1 
-            WHERE property_id = ? 
-              AND appointment_date = ? 
-              AND appointment_time = ? 
-              AND status = 'queued'
-              AND queue_position > ?
-        `, [propertyId, appointmentDate, appointmentTime, nextInQueue.queue_position]);
-        
-        // Create notification for the promoted customer
-        // This is an in-app notification (stored in DB, displayed in UI)
-        await db.query(`
-            INSERT INTO notifications (user_id, type, title, message)
-            VALUES (?, 'appointment', '🎉 Booking Confirmed!', ?)
-        `, [
-            nextInQueue.customer_id,
-            `Great news! Your queued booking for ${nextInQueue.property_title} on ${appointmentDate} at ${appointmentTime} has been promoted to confirmed. The slot is now yours!`
-        ]);
-        
-        // Audit log the queue promotion event
-        auditLogger.logQueuePromotion({
-            appointmentId: nextInQueue.id,
-            customerId: nextInQueue.customer_id,
-            propertyId: propertyId,
-            slot: `${appointmentDate} ${appointmentTime}`,
-            previousPosition: nextInQueue.queue_position,
-            reason: 'Previous booking cancelled'
+    // Use transaction with row locking to prevent race conditions
+    const connection = await db.getConnection();
+    try {
+        await new Promise((resolve, reject) => {
+            connection.beginTransaction(err => err ? reject(err) : resolve());
         });
         
-        console.log(`[QUEUE] Successfully promoted customer ${nextInQueue.customer_id} to confirmed status`);
+        // Find the next queued customer for this slot with row-level lock (FOR UPDATE)
+        // This prevents concurrent modifications during the promotion process
+        const queuedBookings = await new Promise((resolve, reject) => {
+            connection.query(`
+                SELECT a.*, p.title as property_title
+                FROM appointments a
+                JOIN properties p ON a.property_id = p.id
+                WHERE a.property_id = ?
+                  AND a.appointment_date = ?
+                  AND a.appointment_time = ?
+                  AND a.status = 'queued'
+                ORDER BY a.queue_position ASC
+                LIMIT 1
+                FOR UPDATE
+            `, [propertyId, appointmentDate, appointmentTime], (err, result) => err ? reject(err) : resolve(result));
+        });
         
-        return nextInQueue;
+        if (queuedBookings.length > 0) {
+            const nextInQueue = queuedBookings[0];
+            
+            // Log the promotion event
+            console.log(`[QUEUE] Promoting customer ${nextInQueue.customer_id} from position ${nextInQueue.queue_position}`);
+            
+            // Promote to confirmed status within transaction
+            // Clear queue_position as they're no longer in the queue
+            await new Promise((resolve, reject) => {
+                connection.query(`
+                    UPDATE appointments 
+                    SET status = 'confirmed', queue_position = NULL 
+                    WHERE id = ?
+                `, [nextInQueue.id], (err, result) => err ? reject(err) : resolve(result));
+            });
+            
+            // Update queue positions for remaining queued bookings
+            // Everyone moves up one position
+            await new Promise((resolve, reject) => {
+                connection.query(`
+                    UPDATE appointments 
+                    SET queue_position = queue_position - 1 
+                    WHERE property_id = ? 
+                      AND appointment_date = ? 
+                      AND appointment_time = ? 
+                      AND status = 'queued'
+                      AND queue_position > ?
+                `, [propertyId, appointmentDate, appointmentTime, nextInQueue.queue_position], (err, result) => err ? reject(err) : resolve(result));
+            });
+            
+            // Create notification for the promoted customer
+            // This is an in-app notification (stored in DB, displayed in UI)
+            await new Promise((resolve, reject) => {
+                connection.query(`
+                    INSERT INTO notifications (user_id, type, title, message)
+                    VALUES (?, 'appointment', '🎉 Booking Confirmed!', ?)
+                `, [
+                    nextInQueue.customer_id,
+                    `Great news! Your queued booking for ${nextInQueue.property_title} on ${appointmentDate} at ${appointmentTime} has been promoted to confirmed. The slot is now yours!`
+                ], (err, result) => err ? reject(err) : resolve(result));
+            });
+            
+            // Commit transaction
+            await new Promise((resolve, reject) => {
+                connection.commit(err => err ? reject(err) : resolve());
+            });
+            
+            // Audit log the queue promotion event (outside transaction)
+            auditLogger.logQueuePromotion({
+                appointmentId: nextInQueue.id,
+                customerId: nextInQueue.customer_id,
+                propertyId: propertyId,
+                slot: `${appointmentDate} ${appointmentTime}`,
+                previousPosition: nextInQueue.queue_position,
+                reason: 'Previous booking cancelled'
+            });
+            
+            console.log(`[QUEUE] Successfully promoted customer ${nextInQueue.customer_id} to confirmed status`);
+            
+            return nextInQueue;
+        }
+        
+        // Commit even if nothing to promote (release locks)
+        await new Promise((resolve, reject) => {
+            connection.commit(err => err ? reject(err) : resolve());
+        });
+        
+        console.log(`[QUEUE] No queued bookings found for this slot`);
+        return null;
+    } catch (error) {
+        // Rollback on error
+        await new Promise(resolve => {
+            connection.rollback(() => resolve());
+        });
+        console.error('[QUEUE] Error during queue promotion:', error);
+        throw error;
+    } finally {
+        connection.release();
     }
-    
-    console.log(`[QUEUE] No queued bookings found for this slot`);
-    return null;
 }
 
 /**
