@@ -5,6 +5,9 @@
  * - Status tracking (confirmed, queued, promoted, canceled)
  * - Queue position display
  * - Agent rating functionality for completed viewings
+ * 
+ * Note: Utility functions (escapeHtml, formatTime, capitalizeFirst, etc.)
+ * are provided by ../shared/js/utils.js
  */
 
 let currentFilter = 'all';
@@ -127,6 +130,18 @@ function createAppointmentCard(appointment, canRate = false) {
         `;
     }
     
+    // Message agent button for appointments with assigned agents
+    let messageAgentSection = '';
+    if (appointment.agent_id && appointment.agent_first_name && ['pending', 'confirmed', 'queued'].includes(appointment.status)) {
+        const agentName = `${appointment.agent_first_name} ${appointment.agent_last_name}`;
+        const subject = encodeURIComponent(`Question about ${appointment.property_title}`);
+        messageAgentSection = `
+            <a href="messages.html?to=${appointment.agent_id}&subject=${subject}" class="btn btn-message-agent btn-sm" style="margin-top: 10px; display: inline-block;">
+                ✉️ Message Agent
+            </a>
+        `;
+    }
+
     return `
         <div class="appointment-card ${appointment.status}">
             ${queueBanner}
@@ -145,20 +160,11 @@ function createAppointmentCard(appointment, canRate = false) {
                     <br><br>
                     <button class="btn btn-danger" onclick="cancelAppointment(${appointment.id})">Cancel</button>
                 ` : ''}
+                ${messageAgentSection}
                 ${ratingSection}
             </div>
         </div>
     `;
-}
-
-/**
- * Escape HTML
- */
-function escapeHtml(str) {
-    if (!str) return '';
-    const div = document.createElement('div');
-    div.textContent = str;
-    return div.innerHTML;
 }
 
 /**
@@ -282,22 +288,4 @@ async function submitRating(event) {
         errorDiv.textContent = response.data.error || 'Failed to submit rating. Please try again.';
         errorDiv.classList.remove('hidden');
     }
-}
-
-/**
- * Format time string to 12-hour format
- */
-function formatTime(timeStr) {
-    const [hours, minutes] = timeStr.split(':');
-    const hour = parseInt(hours);
-    const ampm = hour >= 12 ? 'PM' : 'AM';
-    const hour12 = hour % 12 || 12;
-    return `${hour12}:${minutes} ${ampm}`;
-}
-
-/**
- * Capitalize first letter
- */
-function capitalizeFirst(str) {
-    return str.charAt(0).toUpperCase() + str.slice(1);
 }

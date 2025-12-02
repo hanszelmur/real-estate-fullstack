@@ -1,5 +1,8 @@
 /**
  * Admin Dashboard Main Application
+ * 
+ * Note: Utility functions (escapeHtml, formatPrice, formatNumber, formatDate, formatTime, capitalize, getStatusBadgeColor, etc.)
+ * are provided by ../shared/js/utils.js
  */
 
 let usersData = [];
@@ -47,6 +50,11 @@ function showDashboard(user) {
     
     loadDashboardData();
     loadAgentsList();
+    
+    // Load unread message count
+    if (typeof loadUnreadCount === 'function') {
+        loadUnreadCount();
+    }
 }
 
 /**
@@ -116,6 +124,11 @@ function navigateTo(pageName) {
         case 'sales': loadSalesReport(); break;
         case 'archived': loadArchivedProperties(); break;
         case 'appointments': loadAppointments(); break;
+        case 'messages': 
+            if (typeof initMessages === 'function') {
+                initMessages();
+            }
+            break;
     }
 }
 
@@ -134,8 +147,8 @@ async function loadDashboardData() {
         const recentUsers = users.slice(0, 5);
         document.getElementById('recentUsers').innerHTML = recentUsers.map(u => `
             <div class="list-item">
-                <strong>${u.first_name} ${u.last_name}</strong>
-                <p>${u.email} - ${capitalize(u.role)}</p>
+                <strong>${escapeHtml(u.first_name)} ${escapeHtml(u.last_name)}</strong>
+                <p>${escapeHtml(u.email)} - ${capitalize(u.role)}</p>
             </div>
         `).join('') || '<p>No users found</p>';
     }
@@ -154,8 +167,8 @@ async function loadDashboardData() {
         
         document.getElementById('recentAppointments').innerHTML = appointments.map(a => `
             <div class="list-item">
-                <strong>${a.property_title}</strong>
-                <p>${a.customer_first_name} ${a.customer_last_name} - ${formatDate(a.appointment_date)}</p>
+                <strong>${escapeHtml(a.property_title)}</strong>
+                <p>${escapeHtml(a.customer_first_name)} ${escapeHtml(a.customer_last_name)} - ${formatDate(a.appointment_date)}</p>
             </div>
         `).join('') || '<p>No appointments found</p>';
     }
@@ -176,7 +189,7 @@ function updateAgentDropdowns() {
     const agentSelect = document.getElementById('propertyAgent');
     if (agentSelect) {
         agentSelect.innerHTML = '<option value="">-- Select Agent --</option>' +
-            agentsData.map(a => `<option value="${a.id}">${a.first_name} ${a.last_name}</option>`).join('');
+            agentsData.map(a => `<option value="${a.id}">${escapeHtml(a.first_name)} ${escapeHtml(a.last_name)}</option>`).join('');
     }
 }
 
@@ -202,9 +215,9 @@ async function loadUsers() {
         tbody.innerHTML = usersData.map(user => `
             <tr>
                 <td>${user.id}</td>
-                <td>${user.first_name} ${user.last_name}</td>
-                <td>${user.email}</td>
-                <td>${user.phone}</td>
+                <td>${escapeHtml(user.first_name)} ${escapeHtml(user.last_name)}</td>
+                <td>${escapeHtml(user.email)}</td>
+                <td>${escapeHtml(user.phone)}</td>
                 <td><span class="badge badge-info">${capitalize(user.role)}</span></td>
                 <td>${user.is_verified ? '✓' : '✗'}</td>
                 <td><span class="badge ${user.is_active ? 'badge-success' : 'badge-danger'}">${user.is_active ? 'Active' : 'Inactive'}</span></td>
@@ -288,12 +301,14 @@ async function loadProperties() {
             return `
             <tr>
                 <td>${p.id}</td>
-                <td>${p.title}</td>
-                <td>${p.city}, ${p.state}</td>
+                <td>${escapeHtml(p.title)}</td>
+                <td>${escapeHtml(p.city)}, ${escapeHtml(p.state)}</td>
                 <td>$${formatPrice(p.price)}${p.listing_type === 'rent' ? '/mo' : ''}</td>
                 <td>${capitalize(p.property_type)}</td>
-                <td><span class="badge ${getStatusBadge(p.status)}">${capitalize(p.status)}</span></td>
+                <td><span class="badge ${getStatusBadgeColor(p.status)}">${capitalize(p.status)}</span></td>
                 <td>${p.agent_first_name ? `${p.agent_first_name} ${p.agent_last_name}` : '-'}</td>
+                <td><span class="badge ${getStatusBadge(p.status)}">${capitalize(p.status)}</span></td>
+                <td>${p.agent_first_name ? `${escapeHtml(p.agent_first_name)} ${escapeHtml(p.agent_last_name)}` : '-'}</td>
                 <td>
                     <button class="btn btn-sm btn-primary" onclick="editProperty(${p.id})">Edit</button>
                     ${showSaleButtons ? `<button class="btn btn-sm btn-success" onclick="showMarkSoldModal(${p.id}, '${escapeHtml(p.title)}', '${isForRent ? 'rented' : 'sold'}')">${isForRent ? 'Rented' : 'Sold'}</button>` : ''}
@@ -525,16 +540,6 @@ function setupImagePreview() {
     }
 }
 
-/**
- * Escape HTML for display
- */
-function escapeHtml(str) {
-    if (!str) return '';
-    const div = document.createElement('div');
-    div.textContent = str;
-    return div.innerHTML;
-}
-
 async function deleteProperty(propertyId) {
     if (!confirm('Are you sure you want to delete this property? This action cannot be undone.')) {
         return;
@@ -570,11 +575,11 @@ async function loadAppointments() {
         tbody.innerHTML = appointmentsData.map(a => `
             <tr>
                 <td>${a.id}</td>
-                <td>${a.property_title}</td>
-                <td>${a.customer_first_name} ${a.customer_last_name}</td>
-                <td>${a.agent_first_name ? `${a.agent_first_name} ${a.agent_last_name}` : '-'}</td>
+                <td>${escapeHtml(a.property_title)}</td>
+                <td>${escapeHtml(a.customer_first_name)} ${escapeHtml(a.customer_last_name)}</td>
+                <td>${a.agent_first_name ? `${escapeHtml(a.agent_first_name)} ${escapeHtml(a.agent_last_name)}` : '-'}</td>
                 <td>${formatDate(a.appointment_date)} ${formatTime(a.appointment_time)}</td>
-                <td><span class="badge ${getStatusBadge(a.status)}">${capitalize(a.status)}</span></td>
+                <td><span class="badge ${getStatusBadgeColor(a.status)}">${capitalize(a.status)}</span></td>
                 <td>
                     <button class="btn btn-sm btn-primary" onclick="editAppointment(${a.id})">Edit</button>
                     <button class="btn btn-sm btn-danger" onclick="deleteAppointment(${a.id})">Delete</button>
@@ -651,43 +656,6 @@ function closeModal(modalId) {
     document.getElementById(modalId).classList.remove('active');
 }
 
-/**
- * Utilities
- */
-function formatPrice(price) {
-    return Number(price).toLocaleString('en-US', { maximumFractionDigits: 0 });
-}
-
-function formatDate(dateStr) {
-    return new Date(dateStr).toLocaleDateString('en-US', {
-        year: 'numeric',
-        month: 'short',
-        day: 'numeric'
-    });
-}
-
-function formatTime(timeStr) {
-    const [hours, minutes] = timeStr.split(':');
-    const hour = parseInt(hours);
-    const ampm = hour >= 12 ? 'PM' : 'AM';
-    const hour12 = hour % 12 || 12;
-    return `${hour12}:${minutes} ${ampm}`;
-}
-
-function capitalize(str) {
-    return str.charAt(0).toUpperCase() + str.slice(1);
-}
-
-function getStatusBadge(status) {
-    switch (status) {
-        case 'available': case 'confirmed': case 'completed': return 'badge-success';
-        case 'pending': return 'badge-warning';
-        case 'sold': case 'rented': return 'badge-info';
-        case 'cancelled': return 'badge-danger';
-        default: return 'badge-secondary';
-    }
-}
-
 // ============================================================================
 // SALES TRACKING FUNCTIONS
 // ============================================================================
@@ -732,6 +700,9 @@ async function loadSalesReport() {
                 <td>$${formatPrice(p.price)}</td>
                 <td>${p.agent_first_name ? `${p.agent_first_name} ${p.agent_last_name}` : '-'}</td>
                 <td>${p.sold_by_first_name ? `${p.sold_by_first_name} ${p.sold_by_last_name}` : '-'}</td>
+                <td><span class="badge ${getStatusBadgeColor(p.status)}">${capitalize(p.status)}</span></td>
+                <td>${p.agent_first_name ? `${escapeHtml(p.agent_first_name)} ${escapeHtml(p.agent_last_name)}` : '-'}</td>
+                <td>${p.sold_by_first_name ? `${escapeHtml(p.sold_by_first_name)} ${escapeHtml(p.sold_by_last_name)}` : '-'}</td>
                 <td><span class="badge ${getStatusBadge(p.status)}">${capitalize(p.status)}</span></td>
                 <td>${p.sold_date ? formatDate(p.sold_date) : '-'}</td>
             </tr>
@@ -749,7 +720,7 @@ function updateSalesAgentDropdown() {
     if (select && agentsData.length > 0) {
         const currentValue = select.value;
         select.innerHTML = '<option value="">All Agents</option>' +
-            agentsData.map(a => `<option value="${a.id}">${a.first_name} ${a.last_name}</option>`).join('');
+            agentsData.map(a => `<option value="${a.id}">${escapeHtml(a.first_name)} ${escapeHtml(a.last_name)}</option>`).join('');
         select.value = currentValue;
     }
 }
@@ -822,7 +793,7 @@ async function loadArchivedProperties() {
                 <td>${escapeHtml(p.title)}</td>
                 <td>${escapeHtml(p.address)}, ${escapeHtml(p.city)}</td>
                 <td>$${formatPrice(p.price)}</td>
-                <td><span class="badge ${getStatusBadge(p.status)}">${capitalize(p.status)}</span></td>
+                <td><span class="badge ${getStatusBadgeColor(p.status)}">${capitalize(p.status)}</span></td>
                 <td>${p.sold_date ? formatDate(p.sold_date) : '-'}</td>
                 <td>
                     <button class="btn btn-sm btn-primary" onclick="unarchiveProperty(${p.id})">Unarchive</button>
@@ -847,7 +818,7 @@ function showMarkSoldModal(propertyId, propertyTitle, action) {
     // Update agent dropdown
     const select = document.getElementById('soldByAgentId');
     select.innerHTML = '<option value="">-- Select Agent --</option>' +
-        agentsData.map(a => `<option value="${a.id}">${a.first_name} ${a.last_name}</option>`).join('');
+        agentsData.map(a => `<option value="${a.id}">${escapeHtml(a.first_name)} ${escapeHtml(a.last_name)}</option>`).join('');
     
     openModal('markSoldModal');
 }

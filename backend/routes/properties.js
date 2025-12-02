@@ -121,7 +121,7 @@ router.get('/', optionalAuth, async (req, res) => {
             FROM properties p
             LEFT JOIN users u ON p.assigned_agent_id = u.id
             LEFT JOIN users s ON p.sold_by_agent_id = s.id
-            WHERE 1=1
+            WHERE p.deleted_at IS NULL
         `;
         const params = [];
         
@@ -187,7 +187,7 @@ router.get('/', optionalAuth, async (req, res) => {
         const properties = await db.query(sql, params);
         
         // Get total count for pagination
-        let countSql = 'SELECT COUNT(*) as total FROM properties WHERE 1=1';
+        let countSql = 'SELECT COUNT(*) as total FROM properties WHERE deleted_at IS NULL';
         const countParams = [];
         
         // Apply same archive filter to count
@@ -241,7 +241,7 @@ router.get('/featured', async (req, res) => {
                    u.last_name as agent_last_name
             FROM properties p
             LEFT JOIN users u ON p.assigned_agent_id = u.id
-            WHERE p.featured = TRUE AND p.status = 'available'
+            WHERE p.featured = TRUE AND p.status = 'available' AND p.deleted_at IS NULL
             ORDER BY p.created_at DESC
             LIMIT 6
         `);
@@ -468,7 +468,7 @@ router.get('/:id', optionalAuth, async (req, res) => {
                    u.phone as agent_phone
             FROM properties p
             LEFT JOIN users u ON p.assigned_agent_id = u.id
-            WHERE p.id = ?
+            WHERE p.id = ? AND p.deleted_at IS NULL
         `, [id]);
         
         if (properties.length === 0) {
@@ -788,15 +788,19 @@ router.put('/:id', authenticate, requireRole('admin', 'agent'), async (req, res)
 
 /**
  * DELETE /api/properties/:id
- * Delete property
+ * Soft delete property (sets deleted_at timestamp)
  * Admin only
+ * 
+ * Note: Uses soft delete pattern to preserve data for audit trails.
+ * The property is not actually removed from the database but marked
+ * as deleted by setting the deleted_at timestamp.
  */
 router.delete('/:id', authenticate, requireRole('admin'), async (req, res) => {
     try {
         const { id } = req.params;
         
-        // Check if property exists
-        const properties = await db.query('SELECT * FROM properties WHERE id = ?', [id]);
+        // Check if property exists and is not already deleted
+        const properties = await db.query('SELECT * FROM properties WHERE id = ? AND deleted_at IS NULL', [id]);
         
         if (properties.length === 0) {
             return res.status(404).json({
@@ -805,8 +809,10 @@ router.delete('/:id', authenticate, requireRole('admin'), async (req, res) => {
             });
         }
         
-        // Delete the property (cascades to appointments, waitlist, assignments)
-        await db.query('DELETE FROM properties WHERE id = ?', [id]);
+        // Soft delete: set deleted_at timestamp instead of hard delete
+        await db.query('UPDATE properties SET deleted_at = NOW() WHERE id = ?', [id]);
+        
+        console.log(`[PROPERTY] Property ${id} soft deleted by admin ${req.user.id}`);
         
         res.json({
             success: true,

@@ -6,6 +6,9 @@
  * - Property management (view, add, edit assigned properties)
  * - Appointment management with status updates
  * - Agent ratings display
+ * 
+ * Note: Utility functions (escapeHtml, formatPrice, formatNumber, formatDate, formatTime, capitalize, etc.)
+ * are provided by ../shared/js/utils.js
  */
 
 let currentAppointmentFilter = 'pending';
@@ -54,6 +57,11 @@ function showDashboard(user) {
     // Load initial data
     loadDashboardData();
     loadAgentRatingSummary();
+    
+    // Load unread message count
+    if (typeof loadUnreadCount === 'function') {
+        loadUnreadCount();
+    }
 }
 
 /**
@@ -143,6 +151,11 @@ function navigateTo(pageName) {
             break;
         case 'appointments':
             loadAppointments();
+            break;
+        case 'messages':
+            if (typeof initMessages === 'function') {
+                initMessages();
+            }
             break;
     }
 }
@@ -760,16 +773,6 @@ async function updateAppointment(event) {
 }
 
 /**
- * Escape HTML
- */
-function escapeHtml(str) {
-    if (!str) return '';
-    const div = document.createElement('div');
-    div.textContent = str;
-    return div.innerHTML;
-}
-
-/**
  * Modal helpers
  */
 function openModal(modalId) {
@@ -778,34 +781,6 @@ function openModal(modalId) {
 
 function closeModal(modalId) {
     document.getElementById(modalId).classList.remove('active');
-}
-
-/**
- * Utility functions
- */
-function formatPrice(price) {
-    return Number(price).toLocaleString('en-US', { maximumFractionDigits: 0 });
-}
-
-function formatDate(dateStr) {
-    return new Date(dateStr).toLocaleDateString('en-US', {
-        weekday: 'short',
-        year: 'numeric',
-        month: 'short',
-        day: 'numeric'
-    });
-}
-
-function formatTime(timeStr) {
-    const [hours, minutes] = timeStr.split(':');
-    const hour = parseInt(hours);
-    const ampm = hour >= 12 ? 'PM' : 'AM';
-    const hour12 = hour % 12 || 12;
-    return `${hour12}:${minutes} ${ampm}`;
-}
-
-function capitalize(str) {
-    return str.charAt(0).toUpperCase() + str.slice(1);
 }
 
 // ============================================================================
