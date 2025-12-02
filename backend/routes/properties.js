@@ -1116,6 +1116,7 @@ router.delete('/:propertyId/photos/:photoId', authenticate, requireRole('admin',
  * - Creates notifications for affected customers
  */
 router.put('/:id/mark-sold', authenticate, requireRole('admin', 'agent'), async (req, res) => {
+    let connection;
     try {
         const { id } = req.params;
         const { soldByAgentId } = req.body;
@@ -1153,39 +1154,58 @@ router.put('/:id/mark-sold', authenticate, requireRole('admin', 'agent'), async 
             ? parseInt(soldByAgentId) 
             : req.user.id;
         
-        // Update property status
-        await db.query(`
-            UPDATE properties 
-            SET status = 'sold', sold_by_agent_id = ?, sold_date = NOW()
-            WHERE id = ?
-        `, [agentId, id]);
+        // Start transaction for atomic operation
+        connection = await db.getConnection();
+        await new Promise((resolve, reject) => {
+            connection.beginTransaction(err => err ? reject(err) : resolve());
+        });
+        
+        // Update property status within transaction
+        await new Promise((resolve, reject) => {
+            connection.query(`
+                UPDATE properties 
+                SET status = 'sold', sold_by_agent_id = ?, sold_date = NOW()
+                WHERE id = ?
+            `, [agentId, id], (err, result) => err ? reject(err) : resolve(result));
+        });
         
         // Get affected appointments (pending or confirmed)
-        const appointments = await db.query(`
-            SELECT a.id, a.customer_id, u.email, u.first_name
-            FROM appointments a
-            JOIN users u ON a.customer_id = u.id
-            WHERE a.property_id = ? AND a.status IN ('pending', 'confirmed', 'queued')
-        `, [id]);
+        const appointments = await new Promise((resolve, reject) => {
+            connection.query(`
+                SELECT a.id, a.customer_id, u.email, u.first_name
+                FROM appointments a
+                JOIN users u ON a.customer_id = u.id
+                WHERE a.property_id = ? AND a.status IN ('pending', 'confirmed', 'queued')
+            `, [id], (err, result) => err ? reject(err) : resolve(result));
+        });
         
         // Cancel all affected appointments and create notifications
         if (appointments.length > 0) {
-            await db.query(`
-                UPDATE appointments 
-                SET status = 'cancelled' 
-                WHERE property_id = ? AND status IN ('pending', 'confirmed', 'queued')
-            `, [id]);
+            await new Promise((resolve, reject) => {
+                connection.query(`
+                    UPDATE appointments 
+                    SET status = 'cancelled' 
+                    WHERE property_id = ? AND status IN ('pending', 'confirmed', 'queued')
+                `, [id], (err, result) => err ? reject(err) : resolve(result));
+            });
             
             // Create notifications for each affected customer
             for (const apt of appointments) {
-                await db.query(`
-                    INSERT INTO notifications (user_id, type, title, message)
-                    VALUES (?, 'property', 'Property Sold', ?)
-                `, [apt.customer_id, `The property "${property.title}" you had an appointment for has been sold. Your appointment has been cancelled.`]);
+                await new Promise((resolve, reject) => {
+                    connection.query(`
+                        INSERT INTO notifications (user_id, type, title, message)
+                        VALUES (?, 'property', 'Property Sold', ?)
+                    `, [apt.customer_id, `The property "${property.title}" you had an appointment for has been sold. Your appointment has been cancelled.`], (err, result) => err ? reject(err) : resolve(result));
+                });
             }
         }
         
-        // Fetch updated property
+        // Commit transaction
+        await new Promise((resolve, reject) => {
+            connection.commit(err => err ? reject(err) : resolve());
+        });
+        
+        // Fetch updated property (outside transaction)
         const updatedProperties = await db.query(`
             SELECT p.*, 
                    s.first_name as sold_by_first_name,
@@ -1205,11 +1225,21 @@ router.put('/:id/mark-sold', authenticate, requireRole('admin', 'agent'), async 
         });
         
     } catch (error) {
+        // Rollback on error
+        if (connection) {
+            await new Promise(resolve => {
+                connection.rollback(() => resolve());
+            });
+        }
         console.error('Mark property sold error:', error);
         res.status(500).json({
             success: false,
             error: 'Failed to mark property as sold.'
         });
+    } finally {
+        if (connection) {
+            connection.release();
+        }
     }
 });
 
@@ -1223,6 +1253,7 @@ router.put('/:id/mark-sold', authenticate, requireRole('admin', 'agent'), async 
  * Same logic as mark-sold but status = 'rented'
  */
 router.put('/:id/mark-rented', authenticate, requireRole('admin', 'agent'), async (req, res) => {
+    let connection;
     try {
         const { id } = req.params;
         const { soldByAgentId } = req.body;
@@ -1260,39 +1291,58 @@ router.put('/:id/mark-rented', authenticate, requireRole('admin', 'agent'), asyn
             ? parseInt(soldByAgentId) 
             : req.user.id;
         
-        // Update property status
-        await db.query(`
-            UPDATE properties 
-            SET status = 'rented', sold_by_agent_id = ?, sold_date = NOW()
-            WHERE id = ?
-        `, [agentId, id]);
+        // Start transaction for atomic operation
+        connection = await db.getConnection();
+        await new Promise((resolve, reject) => {
+            connection.beginTransaction(err => err ? reject(err) : resolve());
+        });
+        
+        // Update property status within transaction
+        await new Promise((resolve, reject) => {
+            connection.query(`
+                UPDATE properties 
+                SET status = 'rented', sold_by_agent_id = ?, sold_date = NOW()
+                WHERE id = ?
+            `, [agentId, id], (err, result) => err ? reject(err) : resolve(result));
+        });
         
         // Get affected appointments (pending or confirmed)
-        const appointments = await db.query(`
-            SELECT a.id, a.customer_id, u.email, u.first_name
-            FROM appointments a
-            JOIN users u ON a.customer_id = u.id
-            WHERE a.property_id = ? AND a.status IN ('pending', 'confirmed', 'queued')
-        `, [id]);
+        const appointments = await new Promise((resolve, reject) => {
+            connection.query(`
+                SELECT a.id, a.customer_id, u.email, u.first_name
+                FROM appointments a
+                JOIN users u ON a.customer_id = u.id
+                WHERE a.property_id = ? AND a.status IN ('pending', 'confirmed', 'queued')
+            `, [id], (err, result) => err ? reject(err) : resolve(result));
+        });
         
         // Cancel all affected appointments and create notifications
         if (appointments.length > 0) {
-            await db.query(`
-                UPDATE appointments 
-                SET status = 'cancelled' 
-                WHERE property_id = ? AND status IN ('pending', 'confirmed', 'queued')
-            `, [id]);
+            await new Promise((resolve, reject) => {
+                connection.query(`
+                    UPDATE appointments 
+                    SET status = 'cancelled' 
+                    WHERE property_id = ? AND status IN ('pending', 'confirmed', 'queued')
+                `, [id], (err, result) => err ? reject(err) : resolve(result));
+            });
             
             // Create notifications for each affected customer
             for (const apt of appointments) {
-                await db.query(`
-                    INSERT INTO notifications (user_id, type, title, message)
-                    VALUES (?, 'property', 'Property Rented', ?)
-                `, [apt.customer_id, `The property "${property.title}" you had an appointment for has been rented. Your appointment has been cancelled.`]);
+                await new Promise((resolve, reject) => {
+                    connection.query(`
+                        INSERT INTO notifications (user_id, type, title, message)
+                        VALUES (?, 'property', 'Property Rented', ?)
+                    `, [apt.customer_id, `The property "${property.title}" you had an appointment for has been rented. Your appointment has been cancelled.`], (err, result) => err ? reject(err) : resolve(result));
+                });
             }
         }
         
-        // Fetch updated property
+        // Commit transaction
+        await new Promise((resolve, reject) => {
+            connection.commit(err => err ? reject(err) : resolve());
+        });
+        
+        // Fetch updated property (outside transaction)
         const updatedProperties = await db.query(`
             SELECT p.*, 
                    s.first_name as sold_by_first_name,
@@ -1312,11 +1362,21 @@ router.put('/:id/mark-rented', authenticate, requireRole('admin', 'agent'), asyn
         });
         
     } catch (error) {
+        // Rollback on error
+        if (connection) {
+            await new Promise(resolve => {
+                connection.rollback(() => resolve());
+            });
+        }
         console.error('Mark property rented error:', error);
         res.status(500).json({
             success: false,
             error: 'Failed to mark property as rented.'
         });
+    } finally {
+        if (connection) {
+            connection.release();
+        }
     }
 });
 

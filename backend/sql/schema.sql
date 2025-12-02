@@ -264,3 +264,45 @@ CREATE TABLE IF NOT EXISTS property_photos (
     FOREIGN KEY (property_id) REFERENCES properties(id) ON DELETE CASCADE,
     FOREIGN KEY (uploaded_by) REFERENCES users(id) ON DELETE SET NULL
 );
+
+-- ============================================================================
+-- MESSAGES TABLE
+-- ============================================================================
+-- Stores two-way messages between users (customer-agent, customer-admin)
+-- parent_id: For threaded replies, references the message being replied to
+-- ============================================================================
+CREATE TABLE IF NOT EXISTS messages (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    sender_id INT NOT NULL,
+    recipient_id INT NOT NULL,
+    parent_id INT DEFAULT NULL,
+    subject VARCHAR(255) NOT NULL,
+    body TEXT NOT NULL,
+    is_read BOOLEAN DEFAULT FALSE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_sender (sender_id),
+    INDEX idx_recipient (recipient_id),
+    INDEX idx_parent (parent_id),
+    INDEX idx_read (recipient_id, is_read),
+    FOREIGN KEY (sender_id) REFERENCES users(id) ON DELETE CASCADE,
+    FOREIGN KEY (recipient_id) REFERENCES users(id) ON DELETE CASCADE,
+    FOREIGN KEY (parent_id) REFERENCES messages(id) ON DELETE SET NULL
+);
+
+-- ============================================================================
+-- FAVORITES TABLE
+-- ============================================================================
+-- Stores customer saved/favorited properties for later viewing
+-- ============================================================================
+CREATE TABLE IF NOT EXISTS favorites (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    customer_id INT NOT NULL,
+    property_id INT NOT NULL,
+    notes TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_customer (customer_id),
+    INDEX idx_property (property_id),
+    FOREIGN KEY (customer_id) REFERENCES users(id) ON DELETE CASCADE,
+    FOREIGN KEY (property_id) REFERENCES properties(id) ON DELETE CASCADE,
+    UNIQUE KEY unique_favorite (customer_id, property_id)
+);

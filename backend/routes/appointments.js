@@ -684,6 +684,7 @@ router.post('/', authenticate, requireVerified, async (req, res) => {
  * @fires QUEUE_PROMOTION audit event (if cancellation triggers promotion)
  */
 router.put('/:id', authenticate, async (req, res) => {
+    let connection;
     try {
         const { id } = req.params;
         const { status, appointmentDate, appointmentTime, notes } = req.body;
@@ -774,23 +775,126 @@ router.put('/:id', authenticate, async (req, res) => {
         
         console.log(`[APPOINTMENT] Status change: ${oldStatus} -> ${newStatus}`);
         
-        // Update appointment
-        await db.query(`
-            UPDATE appointments SET
-                status = ?,
-                appointment_date = ?,
-                appointment_time = ?,
-                notes = ?,
-                queue_position = ?
-            WHERE id = ?
-        `, [
-            newStatus,
-            appointmentDate || appointment.appointment_date,
-            appointmentTime || appointment.appointment_time,
-            notes !== undefined ? notes : appointment.notes,
-            newStatus === 'cancelled' ? null : appointment.queue_position,
-            id
-        ]);
+        // Use transaction for cancellation with queue promotion
+        const needsTransaction = newStatus === 'cancelled' && ['pending', 'confirmed'].includes(oldStatus);
+        
+        if (needsTransaction) {
+            connection = await db.getConnection();
+            await new Promise((resolve, reject) => {
+                connection.beginTransaction(err => err ? reject(err) : resolve());
+            });
+            
+            // Update appointment within transaction
+            await new Promise((resolve, reject) => {
+                connection.query(`
+                    UPDATE appointments SET
+                        status = ?,
+                        appointment_date = ?,
+                        appointment_time = ?,
+                        notes = ?,
+                        queue_position = ?
+                    WHERE id = ?
+                `, [
+                    newStatus,
+                    appointmentDate || appointment.appointment_date,
+                    appointmentTime || appointment.appointment_time,
+                    notes !== undefined ? notes : appointment.notes,
+                    null, // Clear queue position on cancel
+                    id
+                ], (err, result) => err ? reject(err) : resolve(result));
+            });
+            
+            // Update queue positions for this slot (everyone moves up)
+            await new Promise((resolve, reject) => {
+                connection.query(`
+                    UPDATE appointments 
+                    SET queue_position = queue_position - 1 
+                    WHERE property_id = ? 
+                      AND appointment_date = ? 
+                      AND appointment_time = ? 
+                      AND status = 'queued'
+                `, [appointment.property_id, appointment.appointment_date, appointment.appointment_time], 
+                (err, result) => err ? reject(err) : resolve(result));
+            });
+            
+            // Find next in queue to promote
+            const queuedBookings = await new Promise((resolve, reject) => {
+                connection.query(`
+                    SELECT a.*, p.title as property_title
+                    FROM appointments a
+                    JOIN properties p ON a.property_id = p.id
+                    WHERE a.property_id = ?
+                      AND a.appointment_date = ?
+                      AND a.appointment_time = ?
+                      AND a.status = 'queued'
+                    ORDER BY a.queue_position ASC
+                    LIMIT 1
+                `, [appointment.property_id, appointment.appointment_date, appointment.appointment_time],
+                (err, result) => err ? reject(err) : resolve(result));
+            });
+            
+            var promotedCustomer = null;
+            if (queuedBookings.length > 0) {
+                const nextInQueue = queuedBookings[0];
+                console.log(`[QUEUE] Promoting customer ${nextInQueue.customer_id} from position ${nextInQueue.queue_position}`);
+                
+                // Promote to confirmed status
+                await new Promise((resolve, reject) => {
+                    connection.query(`
+                        UPDATE appointments 
+                        SET status = 'confirmed', queue_position = NULL 
+                        WHERE id = ?
+                    `, [nextInQueue.id], (err, result) => err ? reject(err) : resolve(result));
+                });
+                
+                // Create notification for the promoted customer
+                await new Promise((resolve, reject) => {
+                    connection.query(`
+                        INSERT INTO notifications (user_id, type, title, message)
+                        VALUES (?, 'appointment', '🎉 Booking Confirmed!', ?)
+                    `, [
+                        nextInQueue.customer_id,
+                        `Great news! Your queued booking for ${nextInQueue.property_title} on ${appointment.appointment_date} at ${appointment.appointment_time} has been promoted to confirmed. The slot is now yours!`
+                    ], (err, result) => err ? reject(err) : resolve(result));
+                });
+                
+                promotedCustomer = nextInQueue;
+                
+                // Audit log the queue promotion event
+                auditLogger.logQueuePromotion({
+                    appointmentId: nextInQueue.id,
+                    customerId: nextInQueue.customer_id,
+                    propertyId: appointment.property_id,
+                    slot: `${appointment.appointment_date} ${appointment.appointment_time}`,
+                    previousPosition: nextInQueue.queue_position,
+                    reason: 'Previous booking cancelled'
+                });
+            }
+            
+            // Commit transaction
+            await new Promise((resolve, reject) => {
+                connection.commit(err => err ? reject(err) : resolve());
+            });
+        } else {
+            // No transaction needed - simple update
+            await db.query(`
+                UPDATE appointments SET
+                    status = ?,
+                    appointment_date = ?,
+                    appointment_time = ?,
+                    notes = ?,
+                    queue_position = ?
+                WHERE id = ?
+            `, [
+                newStatus,
+                appointmentDate || appointment.appointment_date,
+                appointmentTime || appointment.appointment_time,
+                notes !== undefined ? notes : appointment.notes,
+                newStatus === 'cancelled' ? null : appointment.queue_position,
+                id
+            ]);
+            var promotedCustomer = null;
+        }
         
         // Log the status change
         if (status && status !== oldStatus) {
@@ -803,32 +907,6 @@ router.put('/:id', authenticate, async (req, res) => {
                 changedBy: user.id,
                 changedByRole: user.role
             });
-        }
-        
-        // ============================================================
-        // QUEUE PROMOTION: Handle cancellation of confirmed booking
-        // When a confirmed slot is cancelled, promote the next in queue
-        // ============================================================
-        let promotedCustomer = null;
-        if (newStatus === 'cancelled' && ['pending', 'confirmed'].includes(oldStatus)) {
-            console.log(`[QUEUE] Cancellation detected, checking for queue promotion`);
-            
-            // Update queue positions for this slot (everyone moves up)
-            await db.query(`
-                UPDATE appointments 
-                SET queue_position = queue_position - 1 
-                WHERE property_id = ? 
-                  AND appointment_date = ? 
-                  AND appointment_time = ? 
-                  AND status = 'queued'
-            `, [appointment.property_id, appointment.appointment_date, appointment.appointment_time]);
-            
-            // Promote next in queue
-            promotedCustomer = await promoteNextInQueue(
-                appointment.property_id, 
-                appointment.appointment_date, 
-                appointment.appointment_time
-            );
         }
         
         // Create notifications for status changes
@@ -885,11 +963,21 @@ router.put('/:id', authenticate, async (req, res) => {
         });
         
     } catch (error) {
+        // Rollback transaction on error
+        if (connection) {
+            await new Promise(resolve => {
+                connection.rollback(() => resolve());
+            });
+        }
         console.error('Update appointment error:', error);
         res.status(500).json({
             success: false,
             error: 'Failed to update appointment.'
         });
+    } finally {
+        if (connection) {
+            connection.release();
+        }
     }
 });
 
