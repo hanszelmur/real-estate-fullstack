@@ -603,3 +603,21 @@ function escapeQuotes(str) {
         .replace(/'/g, "\\'")
         .replace(/"/g, '\\"');
 }
+
+/**
+ * Capitalize first letter
+ */
+function capitalize(str) {
+    if (!str) return '';
+    return str.charAt(0).toUpperCase() + str.slice(1);
+}
+
+/**
+ * Escape HTML to prevent XSS
+ */
+function escapeHtml(str) {
+    if (!str) return '';
+    const div = document.createElement('div');
+    div.textContent = str;
+    return div.innerHTML;
+}
