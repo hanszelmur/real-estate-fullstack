@@ -130,6 +130,18 @@ function createAppointmentCard(appointment, canRate = false) {
         `;
     }
     
+    // Message agent button for appointments with assigned agents
+    let messageAgentSection = '';
+    if (appointment.agent_id && appointment.agent_first_name && ['pending', 'confirmed', 'queued'].includes(appointment.status)) {
+        const agentName = `${appointment.agent_first_name} ${appointment.agent_last_name}`;
+        const subject = encodeURIComponent(`Question about ${appointment.property_title}`);
+        messageAgentSection = `
+            <a href="messages.html?to=${appointment.agent_id}&subject=${subject}" class="btn btn-message-agent btn-sm" style="margin-top: 10px; display: inline-block;">
+                ✉️ Message Agent
+            </a>
+        `;
+    }
+
     return `
         <div class="appointment-card ${appointment.status}">
             ${queueBanner}
@@ -148,6 +160,7 @@ function createAppointmentCard(appointment, canRate = false) {
                     <br><br>
                     <button class="btn btn-danger" onclick="cancelAppointment(${appointment.id})">Cancel</button>
                 ` : ''}
+                ${messageAgentSection}
                 ${ratingSection}
             </div>
         </div>

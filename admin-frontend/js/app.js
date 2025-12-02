@@ -50,6 +50,11 @@ function showDashboard(user) {
     
     loadDashboardData();
     loadAgentsList();
+    
+    // Load unread message count
+    if (typeof loadUnreadCount === 'function') {
+        loadUnreadCount();
+    }
 }
 
 /**
@@ -119,6 +124,11 @@ function navigateTo(pageName) {
         case 'sales': loadSalesReport(); break;
         case 'archived': loadArchivedProperties(); break;
         case 'appointments': loadAppointments(); break;
+        case 'messages': 
+            if (typeof initMessages === 'function') {
+                initMessages();
+            }
+            break;
     }
 }
 
