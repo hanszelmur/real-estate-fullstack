@@ -152,8 +152,8 @@ This release introduces complete property lifecycle management, enabling agents 
 ## 📋 Table of Contents
 
 - [Production Readiness Assessment](#-production-readiness-assessment)
-- [Known Limitations](#️-known-limitations)
-- [Future Roadmap](#️-future-roadmap)
+- [Known Limitations](#%EF%B8%8F-known-limitations)
+- [Future Roadmap](#%EF%B8%8F-future-roadmap)
 - [Technical Debt & Improvements](#-technical-debt--improvements)
 - [Deployment Guide](#-deployment-guide)
 - [What's New (v1.1.0)](#-whats-new-v110)
@@ -319,9 +319,12 @@ cd backend && npm install --production
 cp .env.example .env
 nano .env  # Configure production values
 
-# 4. Set up MySQL
-mysql -u root -p < backend/sql/schema.sql
-mysql -u root -p < backend/sql/seed.sql  # Optional: demo data
+# 4. Set up MySQL database and user
+mysql -u root -p -e "CREATE DATABASE real_estate_db;"
+mysql -u root -p -e "CREATE USER 'app_user'@'localhost' IDENTIFIED BY 'your_secure_password';"
+mysql -u root -p -e "GRANT ALL PRIVILEGES ON real_estate_db.* TO 'app_user'@'localhost';"
+mysql -u root -p real_estate_db < backend/sql/schema.sql
+mysql -u root -p real_estate_db < backend/sql/seed.sql  # Optional: demo data
 
 # 5. Install PM2 for process management
 npm install -g pm2
@@ -359,8 +362,8 @@ services:
       - "3000:3000"
     environment:
       - DB_HOST=db
-      - DB_USER=root
-      - DB_PASSWORD=${DB_PASSWORD}
+      - DB_USER=app_user
+      - DB_PASSWORD=${APP_DB_PASSWORD}
       - DB_NAME=real_estate_db
     depends_on:
       - db
@@ -368,8 +371,10 @@ services:
   db:
     image: mysql:8.0
     environment:
-      - MYSQL_ROOT_PASSWORD=${DB_PASSWORD}
+      - MYSQL_ROOT_PASSWORD=${DB_ROOT_PASSWORD}
       - MYSQL_DATABASE=real_estate_db
+      - MYSQL_USER=app_user
+      - MYSQL_PASSWORD=${APP_DB_PASSWORD}
     volumes:
       - mysql_data:/var/lib/mysql
       - ./backend/sql:/docker-entrypoint-initdb.d
