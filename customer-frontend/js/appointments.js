@@ -5,6 +5,9 @@
  * - Status tracking (confirmed, queued, promoted, canceled)
  * - Queue position display
  * - Agent rating functionality for completed viewings
+ * 
+ * Note: Utility functions (escapeHtml, formatTime, capitalizeFirst, etc.)
+ * are provided by ../shared/js/utils.js
  */
 
 let currentFilter = 'all';
@@ -152,16 +155,6 @@ function createAppointmentCard(appointment, canRate = false) {
 }
 
 /**
- * Escape HTML
- */
-function escapeHtml(str) {
-    if (!str) return '';
-    const div = document.createElement('div');
-    div.textContent = str;
-    return div.innerHTML;
-}
-
-/**
  * Escape quotes and backslashes for inline JS
  */
 function escapeQuotes(str) {
@@ -282,22 +275,4 @@ async function submitRating(event) {
         errorDiv.textContent = response.data.error || 'Failed to submit rating. Please try again.';
         errorDiv.classList.remove('hidden');
     }
-}
-
-/**
- * Format time string to 12-hour format
- */
-function formatTime(timeStr) {
-    const [hours, minutes] = timeStr.split(':');
-    const hour = parseInt(hours);
-    const ampm = hour >= 12 ? 'PM' : 'AM';
-    const hour12 = hour % 12 || 12;
-    return `${hour12}:${minutes} ${ampm}`;
-}
-
-/**
- * Capitalize first letter
- */
-function capitalizeFirst(str) {
-    return str.charAt(0).toUpperCase() + str.slice(1);
 }

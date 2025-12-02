@@ -1,5 +1,8 @@
 /**
  * Admin Dashboard Main Application
+ * 
+ * Note: Utility functions (escapeHtml, formatPrice, formatNumber, formatDate, formatTime, capitalize, getStatusBadgeColor, etc.)
+ * are provided by ../shared/js/utils.js
  */
 
 let usersData = [];
@@ -525,16 +528,6 @@ function setupImagePreview() {
     }
 }
 
-/**
- * Escape HTML for display
- */
-function escapeHtml(str) {
-    if (!str) return '';
-    const div = document.createElement('div');
-    div.textContent = str;
-    return div.innerHTML;
-}
-
 async function deleteProperty(propertyId) {
     if (!confirm('Are you sure you want to delete this property? This action cannot be undone.')) {
         return;
@@ -652,40 +645,10 @@ function closeModal(modalId) {
 }
 
 /**
- * Utilities
+ * Status badge helper - uses shared getStatusBadgeColor for consistency
  */
-function formatPrice(price) {
-    return Number(price).toLocaleString('en-US', { maximumFractionDigits: 0 });
-}
-
-function formatDate(dateStr) {
-    return new Date(dateStr).toLocaleDateString('en-US', {
-        year: 'numeric',
-        month: 'short',
-        day: 'numeric'
-    });
-}
-
-function formatTime(timeStr) {
-    const [hours, minutes] = timeStr.split(':');
-    const hour = parseInt(hours);
-    const ampm = hour >= 12 ? 'PM' : 'AM';
-    const hour12 = hour % 12 || 12;
-    return `${hour12}:${minutes} ${ampm}`;
-}
-
-function capitalize(str) {
-    return str.charAt(0).toUpperCase() + str.slice(1);
-}
-
 function getStatusBadge(status) {
-    switch (status) {
-        case 'available': case 'confirmed': case 'completed': return 'badge-success';
-        case 'pending': return 'badge-warning';
-        case 'sold': case 'rented': return 'badge-info';
-        case 'cancelled': return 'badge-danger';
-        default: return 'badge-secondary';
-    }
+    return getStatusBadgeColor(status);
 }
 
 // ============================================================================

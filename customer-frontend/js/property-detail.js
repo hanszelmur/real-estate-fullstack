@@ -3,21 +3,12 @@
  * 
  * Handles single property view, appointment booking with queue awareness,
  * and agent ratings display.
+ * 
+ * Note: Utility functions (escapeHtml, formatPrice, formatNumber, capitalizeFirst, etc.)
+ * are provided by ../shared/js/utils.js
  */
 
 let currentProperty = null;
-
-/**
- * Escape HTML special characters to prevent XSS
- * @param {string} str - String to escape
- * @returns {string} - Escaped string
- */
-function escapeHtml(str) {
-    if (!str) return '';
-    const div = document.createElement('div');
-    div.textContent = str;
-    return div.innerHTML;
-}
 
 document.addEventListener('DOMContentLoaded', () => {
     loadPropertyDetail();
@@ -414,25 +405,4 @@ async function handleBooking(event) {
         errorDiv.textContent = response.data.error || 'Failed to submit request. Please try again.';
         errorDiv.classList.remove('hidden');
     }
-}
-
-/**
- * Format price with commas
- */
-function formatPrice(price) {
-    return Number(price).toLocaleString('en-US', { maximumFractionDigits: 0 });
-}
-
-/**
- * Format number with commas
- */
-function formatNumber(num) {
-    return Number(num).toLocaleString('en-US');
-}
-
-/**
- * Capitalize first letter
- */
-function capitalizeFirst(str) {
-    return str.charAt(0).toUpperCase() + str.slice(1);
 }
