@@ -7,6 +7,7 @@
 
 const db = require('../config/database');
 const { decodeToken } = require('../utils/auth');
+const logger = require('../utils/logger');
 
 /**
  * Authenticate user from request token
@@ -64,7 +65,7 @@ const authenticate = async (req, res, next) => {
         req.user = user;
         next();
     } catch (error) {
-        console.error('Authentication error:', error);
+        logger.error('Authentication error', { error: error.message, stack: error.stack });
         return res.status(500).json({
             success: false,
             error: 'Authentication failed. Please try again.'

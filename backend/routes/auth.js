@@ -17,6 +17,7 @@ const db = require('../config/database');
 const { hashPassword, comparePassword, generateToken, validatePassword, validateEmail, validatePhone } = require('../utils/auth');
 const { createVerification, verifyCode, canResendCode } = require('../utils/verification');
 const { authenticate, requireVerified } = require('../middleware/auth');
+const logger = require('../utils/logger');
 
 /**
  * POST /api/auth/register
@@ -110,7 +111,7 @@ router.post('/register', async (req, res) => {
         });
         
     } catch (error) {
-        console.error('Registration error:', error);
+        logger.error('Registration error', { error: error.message, stack: error.stack });
         res.status(500).json({
             success: false,
             error: 'Registration failed. Please try again.'
@@ -348,7 +349,7 @@ router.post('/login', async (req, res) => {
         });
         
     } catch (error) {
-        console.error('Login error:', error);
+        logger.error('Login error', { error: error.message, stack: error.stack });
         res.status(500).json({
             success: false,
             error: 'Login failed. Please try again.'
@@ -416,7 +417,7 @@ router.post('/forgot-password', async (req, res) => {
         // Always return success to prevent email enumeration
         if (users.length === 0) {
             // Log attempt but don't reveal user doesn't exist
-            console.log(`[AUTH] Password reset requested for non-existent email: ${email}`);
+            logger.info('Password reset requested for non-existent email', { email });
             return res.json({
                 success: true,
                 message: 'If this email exists in our system, a reset code has been sent to the registered phone number.'
@@ -428,7 +429,7 @@ router.post('/forgot-password', async (req, res) => {
         // Create verification code for password reset
         const verification = await createVerification(user.phone);
         
-        console.log(`[AUTH] Password reset code created for user ${user.id} (${email})`);
+        logger.info('Password reset code created', { userId: user.id, email });
         
         res.json({
             success: true,
@@ -507,7 +508,7 @@ router.post('/reset-password', async (req, res) => {
             [passwordHash, user.id]
         );
         
-        console.log(`[AUTH] Password reset successful for user ${user.id}`);
+        logger.info('Password reset successful', { userId: user.id });
         
         res.json({
             success: true,
@@ -515,7 +516,7 @@ router.post('/reset-password', async (req, res) => {
         });
         
     } catch (error) {
-        console.error('Reset password error:', error);
+        logger.error('Reset password error', { error: error.message, stack: error.stack });
         res.status(500).json({
             success: false,
             error: 'Failed to reset password. Please try again.'
