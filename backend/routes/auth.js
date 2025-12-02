@@ -386,4 +386,141 @@ router.get('/me', authenticate, async (req, res) => {
     }
 });
 
+/**
+ * POST /api/auth/forgot-password
+ * Request a password reset code
+ * 
+ * Body: { email }
+ * Response: { success, message }
+ * 
+ * This sends a reset code to the user's registered phone number.
+ * In production, this could also send an email with a reset link.
+ */
+router.post('/forgot-password', async (req, res) => {
+    try {
+        const { email } = req.body;
+        
+        if (!email) {
+            return res.status(400).json({
+                success: false,
+                error: 'Email is required.'
+            });
+        }
+        
+        // Find user by email
+        const users = await db.query(
+            'SELECT id, phone, first_name FROM users WHERE email = ? AND is_active = TRUE',
+            [email.toLowerCase()]
+        );
+        
+        // Always return success to prevent email enumeration
+        if (users.length === 0) {
+            // Log attempt but don't reveal user doesn't exist
+            console.log(`[AUTH] Password reset requested for non-existent email: ${email}`);
+            return res.json({
+                success: true,
+                message: 'If this email exists in our system, a reset code has been sent to the registered phone number.'
+            });
+        }
+        
+        const user = users[0];
+        
+        // Create verification code for password reset
+        const verification = await createVerification(user.phone);
+        
+        console.log(`[AUTH] Password reset code created for user ${user.id} (${email})`);
+        
+        res.json({
+            success: true,
+            message: 'If this email exists in our system, a reset code has been sent to the registered phone number.',
+            // Only include phone hint in dev mode
+            phoneHint: process.env.NODE_ENV !== 'production' ? user.phone.slice(-4) : undefined
+        });
+        
+    } catch (error) {
+        console.error('Forgot password error:', error);
+        res.status(500).json({
+            success: false,
+            error: 'Failed to process request. Please try again.'
+        });
+    }
+});
+
+/**
+ * POST /api/auth/reset-password
+ * Reset password with verification code
+ * 
+ * Body: { email, code, newPassword }
+ * Response: { success, message }
+ */
+router.post('/reset-password', async (req, res) => {
+    try {
+        const { email, code, newPassword } = req.body;
+        
+        if (!email || !code || !newPassword) {
+            return res.status(400).json({
+                success: false,
+                error: 'Email, code, and new password are required.'
+            });
+        }
+        
+        // Validate password strength
+        const passwordValidation = validatePassword(newPassword);
+        if (!passwordValidation.isValid) {
+            return res.status(400).json({
+                success: false,
+                error: passwordValidation.message
+            });
+        }
+        
+        // Find user by email
+        const users = await db.query(
+            'SELECT id, phone FROM users WHERE email = ? AND is_active = TRUE',
+            [email.toLowerCase()]
+        );
+        
+        if (users.length === 0) {
+            return res.status(400).json({
+                success: false,
+                error: 'Invalid email or code.'
+            });
+        }
+        
+        const user = users[0];
+        
+        // Verify the code
+        const isValidCode = await verifyCode(user.phone, code);
+        
+        if (!isValidCode) {
+            return res.status(400).json({
+                success: false,
+                error: 'Invalid or expired reset code.'
+            });
+        }
+        
+        // Hash new password
+        const passwordHash = await hashPassword(newPassword);
+        
+        // Update password
+        await db.query(
+            'UPDATE users SET password_hash = ? WHERE id = ?',
+            [passwordHash, user.id]
+        );
+        
+        console.log(`[AUTH] Password reset successful for user ${user.id}`);
+        
+        res.json({
+            success: true,
+            message: 'Password reset successfully. You can now login with your new password.'
+        });
+        
+    } catch (error) {
+        console.error('Reset password error:', error);
+        res.status(500).json({
+            success: false,
+            error: 'Failed to reset password. Please try again.'
+        });
+    }
+});
+
 module.exports = router;

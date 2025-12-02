@@ -19,6 +19,7 @@ require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const path = require('path');
+const rateLimit = require('express-rate-limit');
 const db = require('./config/database');
 
 // Import routes
@@ -29,6 +30,9 @@ const userRoutes = require('./routes/users');
 const notificationRoutes = require('./routes/notifications');
 const waitlistRoutes = require('./routes/waitlist');
 const ratingsRoutes = require('./routes/ratings');
+const messagesRoutes = require('./routes/messages');
+const favoritesRoutes = require('./routes/favorites');
+const analyticsRoutes = require('./routes/analytics');
 
 // Create Express app
 const app = express();
@@ -69,6 +73,41 @@ app.use((req, res, next) => {
 });
 
 // ============================================================================
+// Rate Limiting
+// ============================================================================
+
+// General rate limiter: 100 requests per 15 minutes per IP
+const generalLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000, // 15 minutes
+    max: 100, // Limit each IP to 100 requests per windowMs
+    message: {
+        success: false,
+        error: 'Too many requests, please try again later.'
+    },
+    standardHeaders: true, // Return rate limit info in the `RateLimit-*` headers
+    legacyHeaders: false // Disable the `X-RateLimit-*` headers
+});
+
+// Auth rate limiter: 5 attempts per 15 minutes per IP (for login/register)
+const authLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000, // 15 minutes
+    max: 5, // Limit each IP to 5 requests per windowMs
+    message: {
+        success: false,
+        error: 'Too many authentication attempts, please try again later.'
+    },
+    standardHeaders: true,
+    legacyHeaders: false
+});
+
+// Apply general rate limiter to all API routes
+app.use('/api', generalLimiter);
+
+// Apply stricter rate limiter to auth endpoints
+app.use('/api/auth/login', authLimiter);
+app.use('/api/auth/register', authLimiter);
+
+// ============================================================================
 // API Routes
 // ============================================================================
 
@@ -89,6 +128,9 @@ app.use('/api/users', userRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/waitlist', waitlistRoutes);
 app.use('/api/ratings', ratingsRoutes);
+app.use('/api/messages', messagesRoutes);
+app.use('/api/favorites', favoritesRoutes);
+app.use('/api/analytics', analyticsRoutes);
 
 // ============================================================================
 // Error Handling

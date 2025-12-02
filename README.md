@@ -15,6 +15,49 @@
 
 ---
 
+## 🆕 What's New (v1.2.0)
+
+### Platform Improvements & New Features
+
+This release addresses critical, high, and medium priority improvements from system critique, introducing new security features and functionality.
+
+#### Security Enhancements
+
+| Feature | Description |
+|---------|-------------|
+| **Rate Limiting** | General API: 100 requests/15min, Auth endpoints: 5 attempts/15min |
+| **Database Transactions** | Mark-sold/rented and queue promotion now use atomic transactions |
+| **Password Reset** | Users can reset passwords via phone verification |
+
+#### New API Endpoints
+
+| Endpoint | Description |
+|----------|-------------|
+| **Messages API** | Two-way messaging between users (inbox, sent, send, reply) |
+| **Favorites API** | Save/unsave properties, toggle, check status |
+| **Analytics API** | Dashboard summary, sales trends, top agents, booking trends |
+| **Password Reset** | `/api/auth/forgot-password` and `/api/auth/reset-password` |
+
+#### Code Quality
+
+| Improvement | Description |
+|-------------|-------------|
+| **Shared API Module** | All frontends now use `../shared/js/api.js` |
+| **Integration Tests** | New test suite for v1.2.0 features |
+| **Database Schema** | Added `messages` and `favorites` tables |
+
+#### New Database Tables
+
+```sql
+-- Messages (two-way messaging)
+messages (id, sender_id, recipient_id, parent_id, subject, body, is_read, created_at)
+
+-- Favorites (saved properties)
+favorites (id, customer_id, property_id, notes, created_at)
+```
+
+---
+
 ## 🆕 What's New (v1.1.0)
 
 ### Property Lifecycle Management
@@ -813,6 +856,8 @@ The admin portal provides full system control and oversight.
 | `POST` | `/api/auth/resend-code` | Resend verification code | Public |
 | `POST` | `/api/auth/login` | User login | Public |
 | `GET` | `/api/auth/me` | Get current user | Authenticated |
+| `POST` | `/api/auth/forgot-password` | Request password reset code | Public |
+| `POST` | `/api/auth/reset-password` | Reset password with code | Public |
 
 ### Properties Endpoints
 
@@ -894,6 +939,39 @@ http://localhost:3000/uploads/images/filename.jpg
 | `POST` | `/api/waitlist` | Join waitlist | Customer |
 | `DELETE` | `/api/waitlist/:id` | Leave waitlist | Authenticated |
 
+### Messages Endpoints (v1.2.0)
+
+| Method | Endpoint | Description | Access |
+|--------|----------|-------------|--------|
+| `GET` | `/api/messages/inbox` | Get received messages | Authenticated |
+| `GET` | `/api/messages/sent` | Get sent messages | Authenticated |
+| `GET` | `/api/messages/:id` | Get message with thread | Authenticated |
+| `POST` | `/api/messages` | Send a new message | Authenticated |
+| `POST` | `/api/messages/:id/reply` | Reply to a message | Authenticated |
+| `PUT` | `/api/messages/:id/read` | Mark message as read | Authenticated |
+| `DELETE` | `/api/messages/:id` | Delete a message | Authenticated |
+
+### Favorites Endpoints (v1.2.0)
+
+| Method | Endpoint | Description | Access |
+|--------|----------|-------------|--------|
+| `GET` | `/api/favorites` | List favorited properties | Customer |
+| `GET` | `/api/favorites/check/:propertyId` | Check if property is favorited | Customer |
+| `POST` | `/api/favorites` | Add property to favorites | Customer (verified) |
+| `POST` | `/api/favorites/toggle` | Toggle favorite status | Customer (verified) |
+| `PUT` | `/api/favorites/:favoriteId` | Update favorite notes | Customer |
+| `DELETE` | `/api/favorites/:favoriteId` | Remove from favorites | Customer |
+| `GET` | `/api/favorites/property/:propertyId/count` | Get favorite count | Admin |
+
+### Analytics Endpoints (v1.2.0)
+
+| Method | Endpoint | Description | Access |
+|--------|----------|-------------|--------|
+| `GET` | `/api/analytics/summary` | Get dashboard summary stats | Admin |
+| `GET` | `/api/analytics/sales-trends` | Get sales trends over time | Admin |
+| `GET` | `/api/analytics/top-agents` | Get top performing agents | Admin |
+| `GET` | `/api/analytics/booking-trends` | Get booking trends over time | Admin |
+
 ---
 
 ## 💾 Database Schema
@@ -912,6 +990,8 @@ http://localhost:3000/uploads/images/filename.jpg
 | `blocked_slots` | Unavailable times | Agent blocks for properties |
 | `notifications` | User messages | Type categorization, read status |
 | `waitlist` | Property interest | Position tracking |
+| `messages` | Two-way messaging | Sender/recipient, threading, read status (v1.2.0) |
+| `favorites` | Saved properties | Customer favorites with notes (v1.2.0) |
 
 ### SQL Table Creation (Run Order)
 

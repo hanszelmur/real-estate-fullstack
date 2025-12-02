@@ -1,4 +1,10 @@
 /**
+ * @deprecated This file is deprecated. Use the shared API module instead:
+ * <script src="../shared/js/api.js"></script>
+ * 
+ * This file is kept for backward compatibility only.
+ * All new development should use the shared API module.
+ * 
  * API Helper Functions for Agent Portal
  */
 const API = {
