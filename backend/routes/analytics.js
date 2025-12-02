@@ -125,22 +125,15 @@ router.get('/sales-trends', authenticate, requireRole('admin'), async (req, res)
     try {
         const { period = 'month', limit = 12 } = req.query;
         
-        let dateFormat, interval;
-        switch (period) {
-            case 'day':
-                dateFormat = '%Y-%m-%d';
-                interval = 'DAY';
-                break;
-            case 'week':
-                dateFormat = '%Y-%u'; // Year-week number
-                interval = 'WEEK';
-                break;
-            case 'month':
-            default:
-                dateFormat = '%Y-%m';
-                interval = 'MONTH';
-                break;
-        }
+        // Whitelist allowed period values to prevent SQL injection
+        const allowedPeriods = {
+            'day': { dateFormat: '%Y-%m-%d', intervalDays: 1 },
+            'week': { dateFormat: '%Y-%u', intervalDays: 7 },
+            'month': { dateFormat: '%Y-%m', intervalDays: 30 }
+        };
+        
+        const periodConfig = allowedPeriods[period] || allowedPeriods['month'];
+        const lookbackDays = periodConfig.intervalDays * parseInt(limit);
         
         const salesTrends = await db.query(`
             SELECT 
@@ -151,11 +144,11 @@ router.get('/sales-trends', authenticate, requireRole('admin'), async (req, res)
             FROM properties
             WHERE status IN ('sold', 'rented')
               AND sold_date IS NOT NULL
-              AND sold_date >= DATE_SUB(NOW(), INTERVAL ? ${interval})
+              AND sold_date >= DATE_SUB(NOW(), INTERVAL ? DAY)
             GROUP BY period
             ORDER BY period DESC
             LIMIT ?
-        `, [dateFormat, parseInt(limit), parseInt(limit)]);
+        `, [periodConfig.dateFormat, lookbackDays, parseInt(limit)]);
         
         res.json({
             success: true,
@@ -183,19 +176,14 @@ router.get('/top-agents', authenticate, requireRole('admin'), async (req, res) =
     try {
         const { limit = 10, sortBy = 'sales' } = req.query;
         
-        let orderBy;
-        switch (sortBy) {
-            case 'value':
-                orderBy = 'total_value DESC';
-                break;
-            case 'rating':
-                orderBy = 'average_rating DESC';
-                break;
-            case 'sales':
-            default:
-                orderBy = 'sales_count DESC';
-                break;
-        }
+        // Whitelist allowed sortBy values to prevent SQL injection
+        const allowedSortBy = {
+            'sales': 'sales_count DESC',
+            'value': 'total_value DESC',
+            'rating': 'average_rating DESC'
+        };
+        
+        const orderBy = allowedSortBy[sortBy] || allowedSortBy['sales'];
         
         const agents = await db.query(`
             SELECT 
@@ -242,22 +230,15 @@ router.get('/booking-trends', authenticate, requireRole('admin'), async (req, re
     try {
         const { period = 'week', limit = 12 } = req.query;
         
-        let dateFormat, interval;
-        switch (period) {
-            case 'day':
-                dateFormat = '%Y-%m-%d';
-                interval = 'DAY';
-                break;
-            case 'month':
-                dateFormat = '%Y-%m';
-                interval = 'MONTH';
-                break;
-            case 'week':
-            default:
-                dateFormat = '%Y-%u';
-                interval = 'WEEK';
-                break;
-        }
+        // Whitelist allowed period values to prevent SQL injection
+        const allowedPeriods = {
+            'day': { dateFormat: '%Y-%m-%d', intervalDays: 1 },
+            'week': { dateFormat: '%Y-%u', intervalDays: 7 },
+            'month': { dateFormat: '%Y-%m', intervalDays: 30 }
+        };
+        
+        const periodConfig = allowedPeriods[period] || allowedPeriods['week'];
+        const lookbackDays = periodConfig.intervalDays * parseInt(limit);
         
         const bookingTrends = await db.query(`
             SELECT 
@@ -268,11 +249,11 @@ router.get('/booking-trends', authenticate, requireRole('admin'), async (req, re
                 SUM(CASE WHEN status = 'cancelled' THEN 1 ELSE 0 END) as cancelled,
                 SUM(CASE WHEN status = 'queued' THEN 1 ELSE 0 END) as queued
             FROM appointments
-            WHERE created_at >= DATE_SUB(NOW(), INTERVAL ? ${interval})
+            WHERE created_at >= DATE_SUB(NOW(), INTERVAL ? DAY)
             GROUP BY period
             ORDER BY period DESC
             LIMIT ?
-        `, [dateFormat, parseInt(limit), parseInt(limit)]);
+        `, [periodConfig.dateFormat, lookbackDays, parseInt(limit)]);
         
         res.json({
             success: true,

@@ -685,6 +685,7 @@ router.post('/', authenticate, requireVerified, async (req, res) => {
  */
 router.put('/:id', authenticate, async (req, res) => {
     let connection;
+    let promotedCustomer = null;
     try {
         const { id } = req.params;
         const { status, appointmentDate, appointmentTime, notes } = req.body;
@@ -833,7 +834,6 @@ router.put('/:id', authenticate, async (req, res) => {
                 (err, result) => err ? reject(err) : resolve(result));
             });
             
-            var promotedCustomer = null;
             if (queuedBookings.length > 0) {
                 const nextInQueue = queuedBookings[0];
                 console.log(`[QUEUE] Promoting customer ${nextInQueue.customer_id} from position ${nextInQueue.queue_position}`);
@@ -893,7 +893,6 @@ router.put('/:id', authenticate, async (req, res) => {
                 newStatus === 'cancelled' ? null : appointment.queue_position,
                 id
             ]);
-            var promotedCustomer = null;
         }
         
         // Log the status change
